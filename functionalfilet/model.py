@@ -123,8 +123,16 @@ class FunctionnalFillet():
 		else :
 			self.memory = [ReplayMemory(1024, self.NAMED_M) for n in range(self.NB_SEEDER)]
 		
-	def step(self, INPUT, index=0) :
+	def step(self, INPUT, index=0, message=False):
 		in_tensor = torch.tensor(INPUT, dtype=torch.float)
+		if message : print("[INFO] Switch to inference mode for model:"+str(index))
+		"""
+		Note : For Reinforcement Q learning, it's better to have 2 paired model, this to avoid switching between "train" and "eval" mode during training & optimize convergence. Like :
+		- target_net.load_state_dict(policy_net.state_dict())
+		- target_net.eval()
+		It wasn't done here, because it's not a big problem during training without dropout or batch norm (eval ~= train)
+		"""
+		self.SEEDER_LIST[index].eval()
 		out_probs = self.SEEDER_LIST[index](in_tensor)
 		# exploration dilemna
 		DILEMNA = np.squeeze(out_probs.detach().numpy())
@@ -139,22 +147,29 @@ class FunctionnalFillet():
 			# probability
 			p_norm = order/order.sum()
 			out_choice = np.random.choice(self.IO[1], p=p_norm)
+		if message : print("[INFO] Chosen prediction : " + str(out_choice))
 		return out_choice
 	
-	def predict(self, INPUT, index=0):
+	def predict(self, INPUT, index=0, message=False):
 		if isinstance(INPUT, torch.Tensor) :
 			in_tensor = INPUT.type(torch.float)
 		else :
 			in_tensor = torch.tensor(INPUT, dtype=torch.float)
 		# device
+		if message : print("[INFO] Switch to inference mode for model:"+str(index))
 		in_tensor = in_tensor.to(self.DEVICE)
 		# extract prob
+		self.SEEDER_LIST[index].eval()
 		out_probs = self.SEEDER_LIST[index](in_tensor).cpu().detach().numpy()
-		return np.argmax(out_probs, axis=1)
+		out = np.argmax(out_probs, axis=1)
+		if message : print("[INFO] Prediction : " + str(out))
+		return out
 	
-	def train(self, output, target, generation=0, index=0, episod=0, i_batch=0):
+	def train(self, output, target, generation=0, index=0, episod=0, i_batch=0, message=False):
 		# reset
 		#self.optimizer[index].zero_grad()
+		if message : print("[INFO] Switch to training mode..")
+		self.SEEDER_LIST[index].train()
 		self.SEEDER_LIST[index].zero_grad()
 		# loss computation
 		loss = self.criterion[index](output, target)
@@ -265,5 +280,5 @@ if __name__ == '__main__' :
 	N = BATCH
 	X, Y = mnist_data.train_data, mnist_data.train_labels
 	x, y = X[:N].reshape(N,-1), Y[:N]
-	y_pred = model.predict(x,1)
+	y_pred = model.predict(x,1, True)
 
