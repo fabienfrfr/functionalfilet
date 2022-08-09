@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jan 21 13:43:17 2022
-@author: fabien
+Created on 2022-08-09
+@author: fabienfrfr
 """
 # ML modules
 import numpy as np, pandas as pd
@@ -64,11 +64,12 @@ if NB_BATCH > NB_BATCH/GEN, equivalent of no SGD : only evolution
 """
 class FunctionnalFillet():
 	def __init__(self, arg, NAMED_MEMORY=None, TYPE="class", DEVICE=True, TIME_DEPENDANT = False):
+		print("[INFO] Starting System...")
 		# parameter
 		self.IO =  arg[0]
 		self.BATCH = arg[1]
 		self.NB_GEN = arg[2]
-		self.NB_SEEDER = arg[3]
+		self.NB_SEEDER = int(np.rint(np.sqrt(arg[3]))**2)
 		self.NB_EPISOD = arg[4]
 		self.ALPHA = arg[5] # 1-% of predict (not random step)
 		self.NB_E_P_G = int(self.NB_EPISOD/self.NB_GEN)
@@ -79,15 +80,22 @@ class FunctionnalFillet():
 			self.DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 		else :
 			self.DEVICE = DEVICE
+		print("[INFO] Calculation type : " + self.DEVICE.type)
 		# generate first ENN model
+		print("[INFO] Generate first evolutionnal neural networks..")
+		print("[INFO] Graph part..")
 		self.GRAPH_LIST = [GRAPH_EAT([self.IO, 1], None) for n in range(self.NB_SEEDER-1)]
 		self.SEEDER_LIST = [CTRL_NET(self.IO)]
+		print("[INFO] Networks part..")
 		for g in self.GRAPH_LIST :
 			NEURON_LIST = g.NEURON_LIST
 			self.SEEDER_LIST += [pRNN(NEURON_LIST, self.BATCH, self.IO[0], self.DEVICE, STACK=self.TIME_DEP)]
+		print("[INFO] ENN Generated!")
 		# training parameter
+		print("[INFO] Generate training parameters for population..")
 		self.NEURON_LIST = []
 		self.update_model()
+		print("[INFO] Generate selection parameters for population..")
 		# selection
 		self.loss = pd.DataFrame(columns=['GEN','IDX_SEED', 'EPISOD', 'N_BATCH', 'LOSS_VALUES'])
 		self.supp_param = None
@@ -98,6 +106,7 @@ class FunctionnalFillet():
 		# evolution variable
 		self.PARENTING = [-1*np.ones(self.NB_SEEDER)[None]]
 		self.PARENTING[0][0][:self.NB_CONTROL] = 0
+		print("[INFO] Model created!")
 		
 	def update_model(self):
 		# neuron graph history
@@ -240,7 +249,7 @@ class FunctionnalFillet():
 ### basic exemple
 if __name__ == '__main__' :
 	import torchvision
-	mnist_data = torchvision.datasets.MNIST('', download=True)
+	mnist_data = torchvision.datasets.MNIST(os.path.expanduser('~')+'/Dataset/MNIST', download=True)
 	## parameter
 	IO =  (784,10)
 	BATCH = 25
