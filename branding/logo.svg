@@ -10,11 +10,13 @@
    svg:companyname="functionalfillet"
    svg:companytagline=""
    version="1.1"
-   viewBox="0 0 550 470"
+   viewBox="0 0 391.19284 141.33517"
    class="svg-primary-tile"
    id="svg60"
    sodipodi:docname="logo.svg"
    inkscape:version="1.2.1 (ef4d3fba62, 2022-07-19, custom)"
+   width="391.19284"
+   height="141.33517"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns="http://www.w3.org/2000/svg"
@@ -32,8 +34,8 @@
      inkscape:deskcolor="#d1d1d1"
      showgrid="false"
      inkscape:zoom="0.93085105"
-     inkscape:cx="583.33715"
-     inkscape:cy="429.17715"
+     inkscape:cx="511.36001"
+     inkscape:cy="261.58858"
      inkscape:window-width="1920"
      inkscape:window-height="1052"
      inkscape:window-x="0"
@@ -42,7 +44,9 @@
      inkscape:current-layer="g56">
     <inkscape:grid
        type="xygrid"
-       id="grid320" />
+       id="grid320"
+       originx="-72.670022"
+       originy="-168.63845" />
   </sodipodi:namedview>
   <g
      fill="#ffffff"
@@ -52,14 +56,15 @@
      stroke-linecap="butt"
      stroke-linejoin="miter"
      stroke-miterlimit="10"
-     stroke-dasharray=""
+     stroke-dasharray="none"
      stroke-dashoffset="0"
      font-family="none"
      font-weight="none"
      font-size="none"
      text-anchor="none"
      style="mix-blend-mode:normal;fill:#000000"
-     id="g58">
+     id="g58"
+     transform="translate(-72.670022,-168.63846)">
     <g
        data-paper-data="{&quot;isGlobalGroup&quot;:true,&quot;bounds&quot;:{&quot;x&quot;:65,&quot;y&quot;:168.6384532760473,&quot;width&quot;:420,&quot;height&quot;:132.7230934479054}}"
        id="g56"
