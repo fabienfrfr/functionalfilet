@@ -22,7 +22,10 @@ An Artificial Neural Network Functionalized by Evolution - This model is based o
 
 **Create your own python package :**
 
+	- pip install setuptools
+	- python setup.py sdist bdist_wheel
 	- pip install twine
+	- twine upload dist/*
 
 **Versionning your project :**
 

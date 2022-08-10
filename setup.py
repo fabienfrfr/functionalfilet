@@ -1,4 +1,4 @@
-# copy of https://github.com/NeuralNine/vidstream
+# 20220810 fabienfrfr
 from setuptools import setup, find_packages
 import codecs
 import os
@@ -8,25 +8,25 @@ here = os.path.abspath(os.path.dirname(__file__))
 with codecs.open(os.path.join(here, "README.md"), encoding="utf-8") as fh:
     long_description = "\n" + fh.read()
 
-VERSION = '0.0.13'
-DESCRIPTION = 'Streaming video data via networks'
-LONG_DESCRIPTION = 'A package that allows to build simple streams of video, audio and camera data.'
+VERSION = '0.0.1'
+DESCRIPTION = 'Evolutionnary Neural Network Model with PyTorch'
+LONG_DESCRIPTION = 'A package based on the article : An Artificial Neural Network Functionalized by Evolution'
 
 # Setting up
 setup(
-    name="vidstream",
+    name="functionalfilet",
     version=VERSION,
-    author="NeuralNine (Florian Dedov)",
-    author_email="<mail@neuralnine.com>",
+    author="FabienFrfr (Fabien Furfaro)",
+    author_email="<fabien.furfaro@gmail.com>",
     description=DESCRIPTION,
     long_description_content_type="text/markdown",
     long_description=long_description,
     packages=find_packages(),
-    install_requires=['opencv-python', 'pyautogui', 'pyaudio'],
-    keywords=['python', 'video', 'stream', 'video stream', 'camera stream', 'sockets'],
+    install_requires=['numpy', 'pandas', 'torch', 'torchvision', 'networkx'],
+    keywords=['python', 'pytorch', 'graph', 'machine learning', 'evolution'],
     classifiers=[
         "Development Status :: 1 - Planning",
-        "Intended Audience :: Developers",
+        "Intended Audience :: Developers, Data Scientist",
         "Programming Language :: Python :: 3",
         "Operating System :: Unix",
         "Operating System :: MacOS :: MacOS X",
