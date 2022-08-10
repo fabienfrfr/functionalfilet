@@ -26,7 +26,7 @@ setup(
     keywords=['python', 'pytorch', 'graph', 'machine learning', 'evolution'],
     classifiers=[
         "Development Status :: 1 - Planning",
-        "Intended Audience :: Developers, Data Scientist",
+        "Intended Audience :: Developers",
         "Programming Language :: Python :: 3",
         "Operating System :: Unix",
         "Operating System :: MacOS :: MacOS X",
