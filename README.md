@@ -31,5 +31,6 @@ An Artificial Neural Network Functionalized by Evolution - This model is based o
 
 	- git branch v0.0.1 				# create branch
 	- git checkout v0.0.1 				# go to branch
+	- git push -u origin v0.0.1 		# after add & commit
 	- git checkout master && git merge v0.0.1 	# fusion
 	- Don't do : "git branch -d v0.0.1 "		# delete
