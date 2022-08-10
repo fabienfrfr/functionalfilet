@@ -7,54 +7,19 @@ Created on 2022-08-09
 # ML modules
 import numpy as np, pandas as pd
 import torch, torch.nn as nn
-import torch.nn.functional as F
+from torch.nn.utils.rnn import pack_padded_sequence
 
 # system module
-import pickle, datetime, os
+import pickle, datetime
+import os, time
+from tqdm import tqdm
 
 # networks construction
 from graph.GRAPH_EAT import GRAPH_EAT
 from net.pRNN_GEN import pRNN
 
-##### Prerequisite
-from collections import deque
-import itertools
-
-class ReplayMemory(object):
-	def __init__(self, capacity, named_tuple):
-		self.Transition = named_tuple
-		self.memory = deque([],maxlen=capacity)
-	def push(self, *args):
-		"""Save a transition"""
-		self.memory.append(self.Transition(*args))
-	def sample(self, batch_size):
-		last = self.__len__()
-		sample = list(itertools.islice(self.memory, last-batch_size, last))
-		return sample
-		#return random.sample(self.memory, batch_size)
-	def __len__(self):
-		return len(self.memory)
-
-class CTRL_NET(nn.Module):
-	def __init__(self, IO):
-		super(CTRL_NET, self).__init__()
-		I,O = IO
-		if I+O > 64 :
-			H = 2*int(np.sqrt(I+O))
-		else : 
-			H = 16
-		self.IN = nn.Conv1d(I, I, 1, groups=I, bias=True)
-		self.H1 = nn.Linear(I, H)
-		self.H2 = nn.Linear(H, H)
-		self.OUT = nn.Linear(H, O)
-
-	def forward(self, x):
-		s = x.shape
-		x = self.IN(x.view(s[0],s[1],1)).view(s)
-		x = F.relu(x)
-		x = F.relu(self.H1(x))
-		x = F.relu(self.H2(x))
-		return self.OUT(x)
+# utils
+from utils import ReplayMemory, CTRL_NET
 
 ##### FF MODULE
 """  
@@ -62,7 +27,7 @@ Note hybrid propriety :
 If GEN = 0, equivalent of no evolution during training : only SGD
 if NB_BATCH > NB_BATCH/GEN, equivalent of no SGD : only evolution
 """
-class FunctionnalFillet():
+class FunctionalFilet():
 	def __init__(self, arg, NAMED_MEMORY=None, TYPE="class", DEVICE=True, TIME_DEPENDANT = False):
 		print("[INFO] Starting System...")
 		# parameter
@@ -70,9 +35,13 @@ class FunctionnalFillet():
 		self.BATCH = arg[1]
 		self.NB_GEN = arg[2]
 		self.NB_SEEDER = int(np.rint(np.sqrt(arg[3]))**2)
-		self.NB_EPISOD = arg[4]
-		self.ALPHA = arg[5] # 1-% of predict (not random step)
-		self.NB_E_P_G = int(self.NB_EPISOD/self.NB_GEN)
+		self.ALPHA = arg[4] # 1-% of predict (not random step)
+		if TYPE == "class" :
+			self.NB_BATCH = int(arg[5] / self.BATCH)  # nb_batch = (dataset_lenght * nb_epoch) / batch_size
+			self.NB_E_P_G = int(self.NB_BATCH/self.NB_GEN)
+		else :
+			self.NB_EPISOD = arg[5]
+			self.NB_E_P_G = int(self.NB_EPISOD/self.NB_GEN)
 		self.TIME_DEP = TIME_DEPENDANT
 		self.TYPE = TYPE
 		self.NAMED_M = NAMED_MEMORY
@@ -85,7 +54,7 @@ class FunctionnalFillet():
 		print("[INFO] Generate first evolutionnal neural networks..")
 		print("[INFO] Graph part..")
 		self.GRAPH_LIST = [GRAPH_EAT([self.IO, 1], None) for n in range(self.NB_SEEDER-1)]
-		self.SEEDER_LIST = [CTRL_NET(self.IO)]
+		self.SEEDER_LIST = [CTRL_NET(self.IO, self.DEVICE)]
 		print("[INFO] Networks part..")
 		for g in self.GRAPH_LIST :
 			NEURON_LIST = g.NEURON_LIST
@@ -114,9 +83,9 @@ class FunctionnalFillet():
 		# torch
 		self.optimizer = [torch.optim.Adam(s.parameters()) for s in self.SEEDER_LIST]
 		if self.TYPE == "class" :
-			self.criterion = [nn.CrossEntropyLoss() for n in range(self.NB_SEEDER)]
+			self.criterion = [nn.CrossEntropyLoss().to(self.DEVICE) for n in range(self.NB_SEEDER)]
 		else :
-			self.criterion = [nn.SmoothL1Loss() for n in range(self.NB_SEEDER)] # regression / RL
+			self.criterion = [nn.SmoothL1Loss().to(self.DEVICE) for n in range(self.NB_SEEDER)] # regression / RL
 		# memory
 		if self.NAMED_M == None :
 			self.memory = {"X_train":None, "Y_train":None, "X_test":None, "Y_test":None}
@@ -163,26 +132,28 @@ class FunctionnalFillet():
 		out_probs = self.SEEDER_LIST[index](in_tensor).cpu().detach().numpy()
 		out = np.argmax(out_probs, axis=1)
 		if message : print("[INFO] Prediction : " + str(out))
-		return out
+		return np.squeeze(out)
 	
 	def train(self, output, target, generation=0, index=0, episod=0, i_batch=0, message=False):
 		# reset
+		if self.TYPE!="class":
+			if message : print("[INFO] Switch to training mode..")
+			self.SEEDER_LIST[index].train()
+		if message : print("[INFO] Init gradient..")
 		#self.optimizer[index].zero_grad()
-		if message : print("[INFO] Switch to training mode..")
-		self.SEEDER_LIST[index].train()
 		self.SEEDER_LIST[index].zero_grad()
+		# correct timestep
+		"""
+		output = pack_padded_sequence(output, decode_lengths, batch_first=True)
+		target = pack_padded_sequence(target, decode_lengths, batch_first=True)
+		"""
 		# loss computation
 		loss = self.criterion[index](output, target)
 		# do back-ward
 		loss.backward()
 		self.optimizer[index].step()
 		# save loss
-		self.loss = self.loss.append({'GEN':generation,
-									  'IDX_SEED':index,
-									  'EPISOD':episod,
-									  'N_BATCH':i_batch,
-									  'LOSS_VALUES':float(loss.detach().numpy())},
-									  ignore_index=True)
+		self.loss = self.loss.append({'GEN':generation, 'IDX_SEED':index, 'EPISOD':episod, 'N_BATCH':i_batch, 'LOSS_VALUES':float(loss.cpu().detach().numpy())}, ignore_index=True)
 	
 	def selection(self, GEN, supp_factor=1):
 		# sup median loss selection
@@ -220,7 +191,7 @@ class FunctionnalFillet():
 			if np.random.choice((True,False), 1, p=[1./self.NB_GEN,1-1./self.NB_GEN]):
 				NET_S += [self.SEEDER_LIST[self.NB_CONTROL:][i]]
 			else :
-				NET_S += [pRNN(GRAPH_S[-1].NEURON_LIST, self.BATCH, self.IO[0], STACK=self.TIME_DEP)]
+				NET_S += [pRNN(GRAPH_S[-1].NEURON_LIST, self.BATCH, self.IO[0], self.DEVICE, STACK=self.TIME_DEP)]
 			PARENT += [i+1]
 		### mutation
 		GRAPH_M = []
@@ -228,33 +199,55 @@ class FunctionnalFillet():
 		for g,j in zip(GRAPH_S,GRAPH_IDX):
 			for i in range(self.NB_EVOLUTION):
 				GRAPH_M += [g.NEXT_GEN()]
-				NET_M += [pRNN(GRAPH_M[-1].NEURON_LIST, self.BATCH, self.IO[0], STACK=self.TIME_DEP)]
+				NET_M += [pRNN(GRAPH_M[-1].NEURON_LIST, self.BATCH, self.IO[0], self.DEVICE, STACK=self.TIME_DEP)]
 				PARENT += [j+1]
 		### news random
 		GRAPH_N = []
 		NET_N = []
 		for n in range(self.NB_CHALLENGE):
 			GRAPH_N += [GRAPH_EAT([self.IO, 1], None)]
-			NET_N += [pRNN(GRAPH_N[-1].NEURON_LIST, self.BATCH, self.IO[0], STACK=self.TIME_DEP)]
+			NET_N += [pRNN(GRAPH_N[-1].NEURON_LIST, self.BATCH, self.IO[0], self.DEVICE, STACK=self.TIME_DEP)]
 			PARENT += [-1]
 		### update seeder list and stock info
 		self.PARENTING += [np.array(PARENT)[None]]
 		self.GRAPH_LIST = GRAPH_S + GRAPH_M + GRAPH_N
 		self.SEEDER_LIST = NET_C + NET_S + NET_M + NET_N
 		### update model
-		self.UPDATE_MODEL()
+		self.update_model()
 
-	def fit(self, train_in, train_target, test_in, test_target):
+	def fit(self, dataset):
 		# SUPERVISED TRAIN
-		return
+		for g in tqdm(range(self.NB_GEN)) :
+			# Loading data for each gen
+			data_loader = torch.utils.data.DataLoader(dataset, batch_size=self.BATCH, shuffle=True)
+			# Train
+			for n in tqdm(range(self.NB_SEEDER)) :
+				# switch torch model to train mode
+				self.SEEDER_LIST[n].train()
+				for batch_idx, (data, target) in enumerate(data_loader) :
+					# vectorization
+					x = data.reshape(self.BATCH,-1)
+					# calculate
+					output = self.SEEDER_LIST[n](x.to(self.DEVICE))
+					# train
+					self.train(output, target.to(self.DEVICE), g, n, 0, batch_idx)
+					if batch_idx == self.NB_E_P_G :
+						break
+						# evaluate
+						supp_factor = self.predict(data.to(self.DEVICE), n)
+			# selection
+			self.selection(g, supp_factor = 1)
+		# finalization
+		self.finalization()
 
 	def finalization(self, supp_param=None, save=True):
 		self.PARENTING = np.concatenate(self.PARENTING).T
 		self.supp_param = supp_param
 		if save :
-			if(not os.path.isdir('OUT')): os.makedirs('OUT')
+			path = os.path.expanduser('~')+'/Saved_Model'
+			if(not os.path.isdir(path)): os.makedirs(path)
 			time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-			filehandler = open("OUT"+os.path.sep+"MODEL_FF_"+time+".obj", 'wb')
+			filehandler = open(path+os.path.sep+"MODEL_FF_"+time+".obj", 'wb')
 			pickle.dump(self, filehandler); filehandler.close()
 	
 	def load(self, Filename):
@@ -264,21 +257,26 @@ class FunctionnalFillet():
 ### basic exemple
 if __name__ == '__main__' :
 	import torchvision
-	mnist_data = torchvision.datasets.MNIST(os.path.expanduser('~')+'/Dataset/MNIST', download=True)
+	data_path = os.path.expanduser('~')+'/Dataset/MNIST'
+	Transforms = torchvision.transforms.Compose([torchvision.transforms.Resize((14,14)), torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.1307,), (0.3081,))])
+	mnist_dataset = torchvision.datasets.MNIST(data_path, download=True, transform=Transforms)
 	## parameter
-	IO =  (784,10)
+	IO =  (14*14,10)
 	BATCH = 25
-	NB_GEN = 100
-	NB_SEED = 5**2
-	NB_EPISODE = 25000 #25000
+	NB_GEN = 3
+	NB_SEED = 2**2
+	#NB_EPISODE = 25000 #25000
+	NB_EPOCH = 2
+	TRAIN_LENGHT = int(mnist_dataset.train_data.shape[0] * NB_EPOCH)
 	ALPHA = 0.9
-
 	## load model
-	model = FunctionnalFillet([IO, BATCH, NB_GEN, NB_SEED, NB_EPISODE, ALPHA], TYPE='RL')
-
+	model = FunctionalFilet([IO, BATCH, NB_GEN, NB_SEED, ALPHA, TRAIN_LENGHT], TYPE='class')
+	## Train
+	model.fit(mnist_dataset)
 	## predict (note : linearize image !)
-	N = BATCH
-	X, Y = mnist_data.train_data, mnist_data.train_labels
-	x, y = X[:N].reshape(N,-1), Y[:N]
+	X, Y = mnist_dataset.train_data, mnist_dataset.train_labels
+	x, y = X[:BATCH,::2,::2].reshape(BATCH,-1), Y[:BATCH]
+	y_pred = model.predict(x,0, True)
 	y_pred = model.predict(x,1, True)
+	print("[INFO] Labels is : "+str(y))
 
