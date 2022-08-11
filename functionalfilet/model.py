@@ -15,11 +15,11 @@ import os, time
 from tqdm import tqdm
 
 # networks construction
-from graph.GRAPH_EAT import GRAPH_EAT
-from net.pRNN_GEN import pRNN
+from functionalfilet.graph_eat import GRAPH_EAT
+from functionalfilet.pRNN_net import pRNN
 
 # utils
-from utils import ReplayMemory, CTRL_NET
+from functionalfilet.utils import ReplayMemory, CTRL_NET
 
 ##### FF MODULE
 """  

@@ -22,7 +22,7 @@ setup(
     long_description_content_type="text/markdown",
     long_description=long_description,
     packages=find_packages(),
-    install_requires=['numpy', 'pandas', 'torch', 'torchvision', 'networkx'],
+    install_requires=['numpy', 'pandas', 'torch', 'torchvision', 'networkx', 'tqdm'],
     keywords=['python', 'pytorch', 'graph', 'machine learning', 'evolution'],
     classifiers=[
         "Development Status :: 1 - Planning",
