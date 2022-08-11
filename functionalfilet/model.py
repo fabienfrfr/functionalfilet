@@ -28,7 +28,13 @@ If GEN = 0, equivalent of no evolution during training : only SGD
 if NB_BATCH > NB_BATCH/GEN, equivalent of no SGD : only evolution
 """
 class FunctionalFilet():
-	def __init__(self, arg, NAMED_MEMORY=None, TYPE="class", DEVICE=True, TIME_DEPENDANT = False):
+	def __init__(self, arg=[(64,16), 25, 10, 3**2, 0.9, 10*10000], NAMED_MEMORY=None, TYPE="class", DEVICE=True, TIME_DEPENDANT = False):
+		"""
+		Define standard arguments for deeplearning problem, then :
+			- Adapt each part if user doesn't define argument
+			- Use "convolution" to reduce/increase input to model, for the output, change last layers for optimizer calculation (use also convolution).
+				- norm-batch && dropout possibilities
+		"""
 		print("[INFO] Starting System...")
 		# parameter
 		self.IO =  arg[0]
