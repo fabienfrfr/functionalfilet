@@ -13,11 +13,10 @@ import copy
 
 ################################ GRAPH Evolution Augmenting Topology
 class GRAPH_EAT(GRAPH):
-    def __init__(self, GEN_PARAM, NET):
-        if GEN_PARAM != None :
+    def __init__(self, IO, P_MIN=1, NET=None):
+        if NET == None :
             # first generation
-            IO, P_MIN = GEN_PARAM
-            #Inheritance of Graph_gen
+            # Inheritance of Graph_gen
             super().__init__(IO, P_MIN)
         else : 
             self.IO, self.NEURON_LIST, self.LIST_C = NET

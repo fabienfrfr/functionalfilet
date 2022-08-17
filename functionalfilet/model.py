@@ -27,17 +27,15 @@ Note hybrid propriety :
 If GEN = 0, equivalent of no evolution during training : only SGD
 if NB_BATCH > NB_BATCH/GEN, equivalent of no SGD : only evolution
 """
-class FunctionalFilet():
-	def __init__(self, arg=[(64,16), 25, 10, 3**2, 0.9, 10*10000], NAMED_MEMORY=None, TYPE="class", DEVICE=True, TIME_DEPENDANT = False):
-		"""
-		Define standard arguments for deeplearning problem, then :
-			- Adapt each part if user doesn't define argument
-			- Use "convolution" to reduce/increase input to model, for the output, change last layers for optimizer calculation (use also convolution).
-				- norm-batch && dropout possibilities
-		"""
+class FunctionalFilet(nn.Module):
+	def __init__(self, arg=[(64,16), 25, 10, 3**2, 0.9, 10*10000], NAMED_MEMORY=None, TYPE="class", INVERT=False, DEVICE=True, TIME_DEPENDANT = False):
+		super().__init__()
 		print("[INFO] Starting System...")
 		# parameter
 		self.IO =  arg[0]
+		if INVERT :
+			# Feature augmentation (ex : after bottleneck)
+			self.IO = tuple(reversed(self.IO))
 		self.BATCH = arg[1]
 		self.NB_GEN = arg[2]
 		self.NB_SEEDER = int(np.rint(np.sqrt(arg[3]))**2)
@@ -55,6 +53,7 @@ class FunctionalFilet():
 			self.DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 		else :
 			self.DEVICE = DEVICE
+		self.INVERT = INVERT
 		print("[INFO] Calculation type : " + self.DEVICE.type)
 		# generate first ENN model
 		print("[INFO] Generate first evolutionnal neural networks..")
@@ -103,7 +102,7 @@ class FunctionalFilet():
 		if message : print("[INFO] Switch to inference mode for model:"+str(index))
 		"""
 		Note : For Reinforcement Q learning, it's better to have 2 paired model, this to avoid switching between "train" and "eval" mode during training & optimize convergence. Like :
-		- target_net.load_state_dict(policy_net.state_dict())
+		- target_net.load_state_dict(policy_net.state_dict()) # adding in load of this class
 		- target_net.eval()
 		It wasn't done here, because it's not a big problem during training without dropout or batch norm (eval ~= train)
 		"""
@@ -140,15 +139,24 @@ class FunctionalFilet():
 		if message : print("[INFO] Prediction : " + str(out))
 		return np.squeeze(out)
 	
+	def forward(self, x, index=0):
+		## (if) Input normalization
+
+		## Evolution Block calculation
+		x = self.SEEDER_LIST[index](x.to(self.DEVICE))
+		## (if) Output normalization
+		output = x
+		return output
+
 	def train(self, output, target, generation=0, index=0, episod=0, i_batch=0, message=False):
 		# reset
 		if self.TYPE!="class":
 			if message : print("[INFO] Switch to training mode..")
 			self.SEEDER_LIST[index].train()
 		if message : print("[INFO] Init gradient..")
-		#self.optimizer[index].zero_grad()
-		self.SEEDER_LIST[index].zero_grad()
-		# correct timestep
+		self.optimizer[index].zero_grad() # better if multiple block ?
+		#self.SEEDER_LIST[index].zero_grad()
+		# correct timestep (not included)
 		"""
 		output = pack_padded_sequence(output, decode_lengths, batch_first=True)
 		target = pack_padded_sequence(target, decode_lengths, batch_first=True)
@@ -221,8 +229,40 @@ class FunctionalFilet():
 		### update model
 		self.update_model()
 
+	def BLOCK(self, I,O, first=True) :
+		r = int(np.rint(I/O))
+		if first :
+			block = nn.Sequential(	[nn.Conv1d(I,O),
+									 nn.Dropout(0.9),
+									 nn.BatchNorm1d(),
+									 nn.ReLU(),
+									 nn.MaxPool1d()]).to(self.DEVICE)
+		else :
+			block = nn.Sequential(	[nn.ReLU(),
+									 nn.Conv1d(I,O),
+									 nn.ReLU(),
+									 nn.AvgPool1D(),
+									 nn.Linear(O,O)]).to(self.DEVICE)
+		return block
+
+	def IO_BLOCK(self, s_I, O):
+		if len(s_I) == 2 :
+			I = s_I[1]
+		else :
+			I = np.prod(s_I[1:])
+		if I < O & self.INVERT == False :
+			print("[INFO] Input is lower than output and INVERT is false, the adaptation of the evolutionary block I/O of can be aberrant..")
+		if self.IO[0] != I :
+			self.BLOCK_I = [self.BLOCK for n in range(self.NB_SEEDER)]
+		if self.IO[1] != O :
+			self.BLOCK_0 = [n for n in range(self.NB_SEEDER)]
+
 	def fit(self, dataset):
-		# SUPERVISED TRAIN
+		### SUPERVISED TRAIN
+		s_I, O = dataset.train_data.shape, dataset.train_labels.unique().size()[0]
+		# adjust I/O
+		self.IO_BLOCK(s_I, O)
+		# generation loop
 		for g in tqdm(range(self.NB_GEN)) :
 			# Loading data for each gen
 			data_loader = torch.utils.data.DataLoader(dataset, batch_size=self.BATCH, shuffle=True)
@@ -234,7 +274,7 @@ class FunctionalFilet():
 					# vectorization
 					x = data.reshape(self.BATCH,-1)
 					# calculate
-					output = self.SEEDER_LIST[n](x.to(self.DEVICE))
+					output = self.forward(x, n)
 					# train
 					self.train(output, target.to(self.DEVICE), g, n, 0, batch_idx)
 					if batch_idx == self.NB_E_P_G :

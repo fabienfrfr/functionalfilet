@@ -9,7 +9,7 @@ import numpy as np
 
 ################################ GRAPH of Network
 class GRAPH():
-    def __init__(self, IO, P_MIN, MAX_HIDDEN_LVL = 32):
+    def __init__(self, IO, P_MIN=1, MAX_HIDDEN_LVL = 32):
         
         # assign parameter
         self.IO = IO
