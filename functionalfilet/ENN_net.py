@@ -6,11 +6,11 @@ import torch, torch.nn as nn
 import copy
 
 # networks construction
-from graph_eat import GRAPH_EAT
-from pRNN_net import pRNN
+from functionalfilet.graph_eat import GRAPH_EAT
+from functionalfilet.pRNN_net import pRNN
 
 # utils
-from utils import CTRL_NET
+from functionalfilet.utils import CTRL_NET
 
 class EvoNeuralNet(nn.Module):
 	def __init__(self, IO=(64,16), BATCH=25, DEVICE=torch.device('cpu'), control=False, invert=False, stack=False, graph=None):

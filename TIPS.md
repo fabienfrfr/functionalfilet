@@ -1,3 +1,7 @@
+**Clear (remove) remove all pycache files :**
+
+	- find . | grep -E "(__pycache__|\.pyc|\.pyo$)" | xargs rm -rf
+
 **Create your own python package :**
 
 	- pip install setuptools

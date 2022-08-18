@@ -15,10 +15,10 @@ import os, time, copy
 from tqdm import tqdm
 
 # networks construction
-from ENN_net import EvoNeuralNet
+from functionalfilet.ENN_net import EvoNeuralNet
 
 # utils
-from utils import ReplayMemory
+from functionalfilet.utils import ReplayMemory
 
 ##### FF MODULE
 """  

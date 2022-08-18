@@ -7,7 +7,7 @@ Created on Sun Jan 10 16:19:36 2021
 
 import numpy as np
 
-from graph_gen import GRAPH
+from functionalfilet.graph_gen import GRAPH
 
 import copy
 
