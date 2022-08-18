@@ -3,34 +3,40 @@
 import numpy as np
 import torch, torch.nn as nn
 
+import copy
+
 # networks construction
 from graph_eat import GRAPH_EAT
 from pRNN_net import pRNN
 
 # utils
-from functionalfilet.utils import CTRL_NET
-from graph_show import Graphic
+from utils import CTRL_NET
 
-class EvoNeuralNet(nn.Module, Graphic):
-	def __init__(self, IO=(64,16), BATCH=25, DEVICE=torch.device('cpu'), control=False, invert=False):
+class EvoNeuralNet(nn.Module):
+	def __init__(self, IO=(64,16), BATCH=25, DEVICE=torch.device('cpu'), control=False, invert=False, stack=False, graph=None):
 		super().__init__()
 		# parameter
 		self.io = IO
 		self.batch = BATCH
 		self.device = DEVICE
 		self.invert = invert
+		self.stack = stack
 		# Input adjustment
 		self.patch_in = lambda x:x
 		# Block
 		if control == False :
 			# graph
-			self.graph = GRAPH_EAT(self.io)
+			if graph == None :
+				self.graph = GRAPH_EAT(self.io)
+			else :
+				self.graph = graph
 			self.net = self.graph.NEURON_LIST
 			# pRNN block
-			self.enn_block = pRNN(self.net, self.batch, self.io[0], self.device)
+			self.enn_block = pRNN(self.net, self.batch, self.io[0], self.device, self.stack)
 		else :
 			# control net (add possibility to add own model)
 			self.enn_block = CTRL_NET(self.io, self.device)
+			self.net = self.enn_block.net
 		# Output adjustment
 		self.patch_out = lambda x:x
 		# final layers
@@ -48,7 +54,7 @@ class EvoNeuralNet(nn.Module, Graphic):
 		return block
 
 	def checkIO(self, I, O):
-		self.I, self.O = I,O
+		self.RealIO = I,O
 		if I < O & self.invert == False :
 			print("[INFO] Input is lower than output and INVERT is false, the adaptation of the evolutionary block I/O can be aberrant..")
 		# Input part
@@ -57,7 +63,7 @@ class EvoNeuralNet(nn.Module, Graphic):
 		# Output part
 		if O != self.io[1]:
 			self.patch_out = self.patch(self.io[1], O, first=False)
-			self.fc = nn.Linear(O,O)
+			self.fc = nn.Linear(O,O).to(self.device)
 
 	def forward(self,x):
 		s = x.shape
@@ -66,9 +72,29 @@ class EvoNeuralNet(nn.Module, Graphic):
 		# enn block
 		x = self.enn_block(x)
 		# output
-		x = self.patch_out(x.view(s[0],self.io[1],1)).view(s[0],self.O)
+		x = self.patch_out(x.view(s[0],self.io[1],1)).view(s[0],self.RealIO[1])
 		x = self.fc(x)
 		return x
+
+	def update(self, mode):
+		# copy model
+		state = self.state_dict().copy()
+		ann = EvoNeuralNet(self.io, self.batch, self.device, invert=self.invert, stack=self.stack, graph=copy.deepcopy(self.graph))
+		ann.checkIO(*self.RealIO)
+		ann.load_state_dict(state)
+		# condition mode
+		if mode == 'copy' :
+			return ann
+		elif mode == 'reset':
+			ann.enn_block = pRNN(self.net, self.batch, self.io[0], self.device, self.stack)
+			return ann
+		elif mode == 'mut' :
+			ann.graph = ann.graph.NEXT_GEN()
+			ann.net = ann.graph.NEURON_LIST
+			ann.enn_block = pRNN(ann.net, self.batch, self.io[0], self.device, self.stack)
+			return ann
+		else :
+			print("[INFO] Error")
 
 ### basic exemple
 if __name__ == '__main__' :
@@ -79,3 +105,5 @@ if __name__ == '__main__' :
 	y = torch.randint(0, 8, (5,))
 
 	y_pred = model(x)
+
+	model.graph.SHOW_GRAPH(LINK_LAYERS=False)

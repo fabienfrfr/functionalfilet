@@ -11,15 +11,14 @@ from torch.nn.utils.rnn import pack_padded_sequence
 
 # system module
 import pickle, datetime
-import os, time
+import os, time, copy
 from tqdm import tqdm
 
 # networks construction
-from functionalfilet.graph_eat import GRAPH_EAT
-from functionalfilet.pRNN_net import pRNN
+from ENN_net import EvoNeuralNet
 
 # utils
-from functionalfilet.utils import ReplayMemory, CTRL_NET
+from utils import ReplayMemory
 
 ##### FF MODULE
 """  
@@ -27,24 +26,23 @@ Note hybrid propriety :
 If GEN = 0, equivalent of no evolution during training : only SGD
 if NB_BATCH > NB_BATCH/GEN, equivalent of no SGD : only evolution
 """
-class FunctionalFilet(nn.Module):
-	def __init__(self, arg=[(64,16), 25, 10, 3**2, 0.9, 10*10000], NAMED_MEMORY=None, TYPE="class", INVERT=False, DEVICE=True, TIME_DEPENDANT = False):
-		super().__init__()
+class FunctionalFilet():
+	def __init__(self, io=(64,16), batch=25, nb_gen=100, nb_seed=9, alpha=0.9, train_size=1e6, NAMED_MEMORY=None, TYPE="class", INVERT=False, DEVICE=True, TIME_DEPENDANT = False):
 		print("[INFO] Starting System...")
 		# parameter
-		self.IO =  arg[0]
+		self.IO =  io
 		if INVERT :
 			# Feature augmentation (ex : after bottleneck)
 			self.IO = tuple(reversed(self.IO))
-		self.BATCH = arg[1]
-		self.NB_GEN = arg[2]
-		self.NB_SEEDER = int(np.rint(np.sqrt(arg[3]))**2)
-		self.ALPHA = arg[4] # 1-% of predict (not random step)
+		self.BATCH = batch
+		self.NB_GEN = nb_gen
+		self.NB_SEEDER = max(4,int(np.rint(np.sqrt(nb_seed))**2))
+		self.ALPHA = alpha # 1-% of predict (not random step)
 		if TYPE == "class" :
-			self.NB_BATCH = int(arg[5] / self.BATCH)  # nb_batch = (dataset_lenght * nb_epoch) / batch_size
+			self.NB_BATCH = int(train_size / self.BATCH)  # nb_batch = (dataset_lenght * nb_epoch) / batch_size
 			self.NB_E_P_G = int(self.NB_BATCH/self.NB_GEN)
 		else :
-			self.NB_EPISOD = arg[5]
+			self.NB_EPISOD = train_size
 			self.NB_E_P_G = int(self.NB_EPISOD/self.NB_GEN)
 		self.TIME_DEP = TIME_DEPENDANT
 		self.TYPE = TYPE
@@ -55,36 +53,31 @@ class FunctionalFilet(nn.Module):
 			self.DEVICE = DEVICE
 		self.INVERT = INVERT
 		print("[INFO] Calculation type : " + self.DEVICE.type)
-		# generate first ENN model
-		print("[INFO] Generate first evolutionnal neural networks..")
-		print("[INFO] Graph part..")
-		self.GRAPH_LIST = [GRAPH_EAT([self.IO, 1], None) for n in range(self.NB_SEEDER-1)]
-		self.SEEDER_LIST = [CTRL_NET(self.IO, self.DEVICE)]
-		print("[INFO] Networks part..")
-		for g in self.GRAPH_LIST :
-			NEURON_LIST = g.NEURON_LIST
-			self.SEEDER_LIST += [pRNN(NEURON_LIST, self.BATCH, self.IO[0], self.DEVICE, STACK=self.TIME_DEP)]
-		print("[INFO] ENN Generated!")
-		# training parameter
-		print("[INFO] Generate training parameters for population..")
-		self.NEURON_LIST = []
-		self.update_model()
 		print("[INFO] Generate selection parameters for population..")
-		# selection
-		self.loss = pd.DataFrame(columns=['GEN','IDX_SEED', 'EPISOD', 'N_BATCH', 'LOSS_VALUES'])
-		self.supp_param = None
 		# evolution param
 		self.NB_CONTROL = int(np.power(self.NB_SEEDER, 1./4))
 		self.NB_EVOLUTION = int(np.sqrt(self.NB_SEEDER)-1) # square completion
 		self.NB_CHALLENGE = int(self.NB_SEEDER - (self.NB_EVOLUTION*(self.NB_EVOLUTION+1) + self.NB_CONTROL))
+		print("[INFO] Generate first evolutionnal neural networks..")
+		self.SEEDER_LIST = [EvoNeuralNet(self.IO, self.BATCH, self.DEVICE, control=True) for n in range(self.NB_CONTROL)]
+		for _n in range(self.NB_SEEDER-self.NB_CONTROL) :
+			self.SEEDER_LIST += [EvoNeuralNet(self.IO, self.BATCH, self.DEVICE, stack=self.TIME_DEP)]
+		print("[INFO] ENN Generated!")
+		# training parameter
+		print("[INFO] Generate training parameters for population..")
+		self.update_model()
+		print("[INFO] Generate evolution variable for population..")
+		# selection
+		self.loss = pd.DataFrame(columns=['GEN','IDX_SEED', 'EPISOD', 'N_BATCH', 'LOSS_VALUES'])
+		self.supp_param = None
 		# evolution variable
 		self.PARENTING = [-1*np.ones(self.NB_SEEDER)[None]]
 		self.PARENTING[0][0][:self.NB_CONTROL] = 0
+		# checkpoint
+		self.checkpoint = []
 		print("[INFO] Model created!")
 		
 	def update_model(self):
-		# neuron graph history
-		self.NEURON_LIST += [g.NEURON_LIST for g in self.GRAPH_LIST]
 		# torch
 		self.optimizer = [torch.optim.Adam(s.parameters()) for s in self.SEEDER_LIST]
 		if self.TYPE == "class" :
@@ -100,12 +93,7 @@ class FunctionalFilet(nn.Module):
 	def step(self, INPUT, index=0, message=False):
 		in_tensor = torch.tensor(INPUT, dtype=torch.float)
 		if message : print("[INFO] Switch to inference mode for model:"+str(index))
-		"""
-		Note : For Reinforcement Q learning, it's better to have 2 paired model, this to avoid switching between "train" and "eval" mode during training & optimize convergence. Like :
-		- target_net.load_state_dict(policy_net.state_dict()) # adding in load of this class
-		- target_net.eval()
-		It wasn't done here, because it's not a big problem during training without dropout or batch norm (eval ~= train)
-		"""
+		# activate all link
 		self.SEEDER_LIST[index].eval()
 		out_probs = self.SEEDER_LIST[index](in_tensor)
 		# exploration dilemna
@@ -130,23 +118,14 @@ class FunctionalFilet(nn.Module):
 		else :
 			in_tensor = torch.tensor(INPUT, dtype=torch.float)
 		# device
-		if message : print("[INFO] Switch to inference mode for model:"+str(index))
 		in_tensor = in_tensor.to(self.DEVICE)
 		# extract prob
+		if message : print("[INFO] Switch to inference mode for model:"+str(index))
 		self.SEEDER_LIST[index].eval()
 		out_probs = self.SEEDER_LIST[index](in_tensor).cpu().detach().numpy()
 		out = np.argmax(out_probs, axis=1)
 		if message : print("[INFO] Prediction : " + str(out))
 		return np.squeeze(out)
-	
-	def forward(self, x, index=0):
-		## (if) Input normalization
-
-		## Evolution Block calculation
-		x = self.SEEDER_LIST[index](x.to(self.DEVICE))
-		## (if) Output normalization
-		output = x
-		return output
 
 	def train(self, output, target, generation=0, index=0, episod=0, i_batch=0, message=False):
 		# reset
@@ -169,6 +148,12 @@ class FunctionalFilet(nn.Module):
 		# save loss
 		self.loss = self.loss.append({'GEN':generation, 'IDX_SEED':index, 'EPISOD':episod, 'N_BATCH':i_batch, 'LOSS_VALUES':float(loss.cpu().detach().numpy())}, ignore_index=True)
 	
+	def add_checkpoint(self, gen):
+		i = 0
+		for s in self.SEEDER_LIST :
+			self.checkpoint += [{'GEN':gen,'IDX_SEED':i, 'GRAPH':s.net, 'NETWORKS': s.state_dict()}]
+			i+=1
+
 	def selection(self, GEN, supp_factor=1):
 		# sup median loss selection
 		TailLoss = np.ones(self.NB_SEEDER)
@@ -197,71 +182,39 @@ class FunctionalFilet(nn.Module):
 		### generation parenting
 		PARENT = [0]*self.NB_CONTROL
 		### survivor
-		GRAPH_S = []
 		NET_S = []
 		GRAPH_IDX = list(order[:self.NB_EVOLUTION])
 		for i in GRAPH_IDX :
-			GRAPH_S += [self.GRAPH_LIST[i]]
-			if np.random.choice((True,False), 1, p=[1./self.NB_GEN,1-1./self.NB_GEN]):
-				NET_S += [self.SEEDER_LIST[self.NB_CONTROL:][i]]
+			if np.random.choice((False,True), 1, p=[1./self.NB_GEN,1-1./self.NB_GEN]):
+				NET_S += [self.SEEDER_LIST[self.NB_CONTROL:][i].update('copy')]
 			else :
-				NET_S += [pRNN(GRAPH_S[-1].NEURON_LIST, self.BATCH, self.IO[0], self.DEVICE, STACK=self.TIME_DEP)]
+				NET_S += [self.SEEDER_LIST[self.NB_CONTROL:][i].update('reset')]
 			PARENT += [i+1]
 		### mutation
-		GRAPH_M = []
 		NET_M = []
-		for g,j in zip(GRAPH_S,GRAPH_IDX):
+		for j in GRAPH_IDX:
 			for i in range(self.NB_EVOLUTION):
-				GRAPH_M += [g.NEXT_GEN()]
-				NET_M += [pRNN(GRAPH_M[-1].NEURON_LIST, self.BATCH, self.IO[0], self.DEVICE, STACK=self.TIME_DEP)]
+				NET_M += [self.SEEDER_LIST[self.NB_CONTROL:][i].update('mut')]
 				PARENT += [j+1]
 		### news random
-		GRAPH_N = []
 		NET_N = []
 		for n in range(self.NB_CHALLENGE):
-			GRAPH_N += [GRAPH_EAT([self.IO, 1], None)]
-			NET_N += [pRNN(GRAPH_N[-1].NEURON_LIST, self.BATCH, self.IO[0], self.DEVICE, STACK=self.TIME_DEP)]
+			net = EvoNeuralNet(self.IO, self.BATCH, self.DEVICE)
+			net.checkIO(self.RI, self.RO)
+			NET_N += [net]
 			PARENT += [-1]
 		### update seeder list and stock info
 		self.PARENTING += [np.array(PARENT)[None]]
-		self.GRAPH_LIST = GRAPH_S + GRAPH_M + GRAPH_N
 		self.SEEDER_LIST = NET_C + NET_S + NET_M + NET_N
 		### update model
 		self.update_model()
 
-	def BLOCK(self, I,O, first=True) :
-		r = int(np.rint(I/O))
-		if first :
-			block = nn.Sequential(	[nn.Conv1d(I,O),
-									 nn.Dropout(0.9),
-									 nn.BatchNorm1d(),
-									 nn.ReLU(),
-									 nn.MaxPool1d()]).to(self.DEVICE)
-		else :
-			block = nn.Sequential(	[nn.ReLU(),
-									 nn.Conv1d(I,O),
-									 nn.ReLU(),
-									 nn.AvgPool1D(),
-									 nn.Linear(O,O)]).to(self.DEVICE)
-		return block
-
-	def IO_BLOCK(self, s_I, O):
-		if len(s_I) == 2 :
-			I = s_I[1]
-		else :
-			I = np.prod(s_I[1:])
-		if I < O & self.INVERT == False :
-			print("[INFO] Input is lower than output and INVERT is false, the adaptation of the evolutionary block I/O of can be aberrant..")
-		if self.IO[0] != I :
-			self.BLOCK_I = [self.BLOCK for n in range(self.NB_SEEDER)]
-		if self.IO[1] != O :
-			self.BLOCK_0 = [n for n in range(self.NB_SEEDER)]
-
 	def fit(self, dataset):
 		### SUPERVISED TRAIN
-		s_I, O = dataset.train_data.shape, dataset.train_labels.unique().size()[0]
+		s_I, self.RO = dataset.train_data.shape, dataset.train_labels.unique().size()[0]
+		self.RI = np.prod(s_I[1:])
 		# adjust I/O
-		self.IO_BLOCK(s_I, O)
+		for s in self.SEEDER_LIST : s.checkIO(self.RI, self.RO)
 		# generation loop
 		for g in tqdm(range(self.NB_GEN)) :
 			# Loading data for each gen
@@ -274,13 +227,14 @@ class FunctionalFilet(nn.Module):
 					# vectorization
 					x = data.reshape(self.BATCH,-1)
 					# calculate
-					output = self.forward(x, n)
+					output = self.SEEDER_LIST[n](x.to(self.DEVICE))
 					# train
 					self.train(output, target.to(self.DEVICE), g, n, 0, batch_idx)
 					if batch_idx == self.NB_E_P_G :
 						break
 						# evaluate
 						supp_factor = self.predict(data.to(self.DEVICE), n)
+			self.add_checkpoint(g)
 			# selection
 			self.selection(g, supp_factor = 1)
 		# finalization
@@ -293,10 +247,23 @@ class FunctionalFilet(nn.Module):
 			path = os.path.expanduser('~')+'/Saved_Model'
 			if(not os.path.isdir(path)): os.makedirs(path)
 			time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+			## model checkpoint
+			df = pd.DataFrame(self.checkpoint)
+			df.to_pickle(path+os.path.sep+"saved_ffcheckpoints_"+time+".obj") # compressed
+			"""
 			filehandler = open(path+os.path.sep+"MODEL_FF_"+time+".obj", 'wb')
 			pickle.dump(self, filehandler); filehandler.close()
+			"""
+			## model score
+			self.loss.to_csv(path+os.path.sep+"score_loss_ff"+time+".csv")
+			## model evolution
+			#self.PARENTING
+			## model param
+			param = {}
+			#param = pd.DataFrame(param).to_csv("")
 	
-	def load(self, Filename):
+	def load(self, Date_filename):
+		#target_net.load_state_dict(policy_net.state_dict())
 		with open('OUT'+os.path.sep+Filename, 'rb') as f:
 			return pickle.load(f)
 
@@ -304,25 +271,21 @@ class FunctionalFilet(nn.Module):
 if __name__ == '__main__' :
 	import torchvision
 	data_path = os.path.expanduser('~')+'/Dataset/MNIST'
-	Transforms = torchvision.transforms.Compose([torchvision.transforms.Resize((14,14)), torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.1307,), (0.3081,))])
+	Transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.1307,), (0.3081,))]) # torchvision.transforms.Resize((14,14))
 	mnist_dataset = torchvision.datasets.MNIST(data_path, download=True, transform=Transforms)
-	## parameter
-	IO =  (14*14,10)
-	BATCH = 25
-	NB_GEN = 3
-	NB_SEED = 2**2
-	#NB_EPISODE = 25000 #25000
+	## parameter (not default)
 	NB_EPOCH = 2
-	TRAIN_LENGHT = int(mnist_dataset.train_data.shape[0] * NB_EPOCH)
-	ALPHA = 0.9
+	TRAIN_LENGHT = int(mnist_dataset.train_data.shape[0] * NB_EPOCH)/25
 	## load model
-	model = FunctionalFilet([IO, BATCH, NB_GEN, NB_SEED, ALPHA, TRAIN_LENGHT], TYPE='class')
+	model = FunctionalFilet(nb_seed=4, train_size=TRAIN_LENGHT, TYPE='class')
 	## Train
 	model.fit(mnist_dataset)
 	## predict (note : linearize image !)
+	BATCH = model.BATCH
+	"""
 	X, Y = mnist_dataset.train_data, mnist_dataset.train_labels
 	x, y = X[:BATCH,::2,::2].reshape(BATCH,-1), Y[:BATCH]
 	y_pred = model.predict(x,0, True)
 	y_pred = model.predict(x,1, True)
 	print("[INFO] Labels is : "+str(y))
-
+	"""

@@ -7,7 +7,7 @@ Created on Sun Jan 10 16:19:36 2021
 
 import numpy as np
 
-from functionalfilet.graph_gen import GRAPH
+from graph_gen import GRAPH
 
 import copy
 
@@ -50,7 +50,7 @@ class GRAPH_EAT(GRAPH):
             # permute 2 connection
             NEURON_LIST = self.C_PERMUTATION(NEURON_LIST)
         # return neuronList with mutation or not
-        return GRAPH_EAT(None,[IO, NEURON_LIST.copy(), LIST_C.copy()])
+        return GRAPH_EAT(None,NET=[IO, NEURON_LIST.copy(), LIST_C.copy()])
     
     ### MUTATION PART
     def ADD_CONNECTION(self, NEURON_LIST, LIST_C) :

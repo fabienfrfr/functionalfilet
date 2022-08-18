@@ -6,6 +6,8 @@ Created on Tue Jan  5 09:50:26 2021
 """
 
 import numpy as np
+import networkx as nx
+import pylab as plt
 
 ################################ GRAPH of Network
 class GRAPH():
@@ -144,14 +146,54 @@ class GRAPH():
             NEW_NEURON_LIST[i,-1] = C_LAYER
             i += 1
         return np.array(NEW_NEURON_LIST)
-    
+
+    def SHOW_GRAPH(self, LINK_LAYERS = True):
+        # Create new graph
+        G = nx.DiGraph()
+        # 4-PLET : (IDX, INDEX_LAYERS, INDEX_NODE = Y, X)
+        NEURON_IN, NEURON_OUT = [], []
+        # Input part :
+        for n in range(self.IO[0]):
+            NEURON_OUT += [[0,n,0]]
+        # Layering
+        for n in self.NEURON_LIST :
+            # input part
+            for n_ in range(n[2]) :
+                NEURON_IN  += [[n[0],n_,n[3]-0.25]]
+            # output part
+            for n_ in range(n[1]) :
+                NEURON_OUT  += [[n[0],n_,n[3]+0.25]]
+        NEURON_IN, NEURON_OUT = np.array(NEURON_IN), np.array(NEURON_OUT)
+        # Node construction
+        NEURON_IO = np.concatenate((NEURON_IN, NEURON_OUT))
+        for i in range(len(NEURON_IO)) :
+            y,x = NEURON_IO[i][1:]
+            G.add_node(i, pos=(x,y))
+        ## Connect each Node
+        for n in self.NEURON_LIST :
+            for i in range(n[2]) :
+                # Input
+                n_i = [n[0],i]
+                idx_i = np.where((n_i == NEURON_IN[:, :-1]).all(axis=1))[0]
+                # Output
+                n_o = n[-1][i]
+                idx_o = np.where((n_o == NEURON_OUT[:, :-1]).all(axis=1))[0]
+                ## Edge
+                G.add_edge(int(idx_o)+len(NEURON_IN),int(idx_i))
+                # Link Layers (for topology calculation)
+                if LINK_LAYERS :
+                    for j in np.where(NEURON_OUT[:,0] == n[0])[0]:
+                        G.add_edge(int(idx_i),int(j)+len(NEURON_IN))        
+        # Extract pos dict
+        pos = nx.get_node_attributes(G,'pos')
+        # Show
+        nx.draw(G,pos,node_size=1,alpha=2./3)
+        plt.show()
+
 if __name__ == '__main__' :
     from tqdm import tqdm
     IO = (128,10)
-    for _i in tqdm(range(10)):
-        g = GRAPH(16,IO[0],IO[1],1)
+    for _i in tqdm(range(3)):
+        g = GRAPH(IO)
     print(g.NEURON_LIST)
-    import EXTRA_FUNCTION as EF
-    pos, G = EF.NEURON_2_GRAPH(g.NEURON_LIST, IO)
-    import networkx as nx
-    nx.draw(G,pos,node_size=1,alpha=2./3)
+    g.SHOW_GRAPH(LINK_LAYERS=False)

@@ -1,6 +1,8 @@
 numpy
 pandas
 torch
+Pillow
 torchvision
+matplotlib
 networkx
 tqdm

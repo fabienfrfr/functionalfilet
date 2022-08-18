@@ -34,6 +34,8 @@ class CTRL_NET(nn.Module):
 		self.H1 = nn.Linear(I, H).to(device)
 		self.H2 = nn.Linear(H, H).to(device)
 		self.OUT = nn.Linear(H, O).to(device)
+		# net
+		self.net = np.array([[I,H,H,O]])
 
 	def forward(self, x):
 		s = x.shape
