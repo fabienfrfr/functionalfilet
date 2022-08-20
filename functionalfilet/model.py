@@ -8,6 +8,7 @@ Created on 2022-08-09
 import numpy as np, pandas as pd
 import torch, torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence
+from torch.utils.data import TensorDataset
 
 # system module
 import pickle, datetime
@@ -27,7 +28,7 @@ If GEN = 0, equivalent of no evolution during training : only SGD
 if NB_BATCH > NB_BATCH/GEN, equivalent of no SGD : only evolution
 """
 class FunctionalFilet():
-	def __init__(self, io=(64,16), batch=25, nb_gen=100, nb_seed=9, alpha=0.9, train_size=1e6, NAMED_MEMORY=None, TYPE="class", INVERT=False, DEVICE=True, TIME_DEPENDANT = False):
+	def __init__(self, io=(64,16), batch=25, nb_gen=100, nb_seed=9, alpha=0.9, train_size=1e6, nb_epoch=10, NAMED_MEMORY=None, TYPE="class", INVERT=False, DEVICE=True, TIME_DEPENDANT = False):
 		print("[INFO] Starting System...")
 		# parameter
 		self.IO =  io
@@ -38,7 +39,8 @@ class FunctionalFilet():
 		self.NB_GEN = nb_gen
 		self.NB_SEEDER = max(4,int(np.rint(np.sqrt(nb_seed))**2))
 		self.ALPHA = alpha # 1-% of predict (not random step)
-		if TYPE == "class" :
+		if TYPE == "class" or TYPE == "regress" :
+			self.EPOCH = nb_epoch
 			self.NB_BATCH = int(train_size / self.BATCH)  # nb_batch = (dataset_lenght * nb_epoch) / batch_size
 			self.NB_E_P_G = int(self.NB_BATCH/self.NB_GEN)
 		else :
@@ -65,6 +67,7 @@ class FunctionalFilet():
 		print("[INFO] ENN Generated!")
 		# training parameter
 		print("[INFO] Generate training parameters for population..")
+		self.optimizer, self.criterion = None, None
 		self.update_model()
 		print("[INFO] Generate evolution variable for population..")
 		# selection
@@ -78,6 +81,9 @@ class FunctionalFilet():
 		print("[INFO] Model created!")
 		
 	def update_model(self):
+		# refresh memory
+		del self.optimizer
+		del self.criterion
 		# torch
 		self.optimizer = [torch.optim.Adam(s.parameters()) for s in self.SEEDER_LIST]
 		if self.TYPE == "class" :
@@ -89,6 +95,10 @@ class FunctionalFilet():
 			self.memory = {"X_train":None, "Y_train":None, "X_test":None, "Y_test":None}
 		else :
 			self.memory = [ReplayMemory(1024, self.NAMED_M) for n in range(self.NB_SEEDER)]
+
+		"""
+		*** ADD POSSIBILITY TO CHOOSE A CUSTOM OPTIMIZER
+		"""
 		
 	def step(self, INPUT, index=0, message=False):
 		in_tensor = torch.tensor(INPUT, dtype=torch.float)
@@ -123,7 +133,10 @@ class FunctionalFilet():
 		if message : print("[INFO] Switch to inference mode for model:"+str(index))
 		self.SEEDER_LIST[index].eval()
 		out_probs = self.SEEDER_LIST[index](in_tensor).cpu().detach().numpy()
-		out = np.argmax(out_probs, axis=1)
+		if self.TYPE != "regress":
+			out = np.argmax(out_probs, axis=1)
+		else :
+			out = out_probs
 		if message : print("[INFO] Prediction : " + str(out))
 		return np.squeeze(out)
 
@@ -200,39 +213,64 @@ class FunctionalFilet():
 		NET_N = []
 		for n in range(self.NB_CHALLENGE):
 			net = EvoNeuralNet(self.IO, self.BATCH, self.DEVICE)
-			net.checkIO(self.RI, self.RO)
+			net.checkIO(*self.RealIO)
 			NET_N += [net]
 			PARENT += [-1]
-		### update seeder list and stock info
+		### update seeder list, refresh memory and stock info
 		self.PARENTING += [np.array(PARENT)[None]]
+		del self.SEEDER_LIST
 		self.SEEDER_LIST = NET_C + NET_S + NET_M + NET_N
-		### update model
+		### update model 
 		self.update_model()
+		if self.DEVICE.type == 'cuda':
+			torch.cuda.empty_cache()
 
-	def fit(self, dataset):
+	def fit(self, X, y, sample_weight=None):
 		### SUPERVISED TRAIN
-		s_I, self.RO = dataset.train_data.shape, dataset.train_labels.unique().size()[0]
-		self.RI = np.prod(s_I[1:])
+		# data real shape
+		shape = tuple(X.shape)
+		nb_sample, input_size = shape[0], np.prod(shape[1:])
+		if self.TYPE == "class" :
+			output_size = y.unique().size()[0]
+		else :
+			output_size = torch.prod(torch.tensor(y.shape)[1:]).item()
+		self.RealIO = input_size, output_size
+		print("[INFO] Your dataset size is : " + str(self.RealIO))
+		# data verification size
+		data_ratio = (nb_sample * self.EPOCH) / (self.NB_GEN * self.BATCH)
+		if self.NB_E_P_G > data_ratio :
+			augment = int(1/data_ratio)
+			print("[INFO] Your dataset contains less than min sample per generation. Data augmentation is : " +str(augment))
+			X = torch.cat([X for _i in range(augment*2)])
+			y = torch.cat([y for _i in range(augment*2)])
 		# adjust I/O
-		for s in self.SEEDER_LIST : s.checkIO(self.RI, self.RO)
+		print("[INFO] Apply IO modification if undefined..")
+		for s in self.SEEDER_LIST : s.checkIO(*self.RealIO)
+		print("[INFO] Contruct Dataset formats..")
+		dataset = TensorDataset(X,y)
 		# generation loop
+		print("[INFO] Launch evolution algorithm with SGD !")
 		for g in tqdm(range(self.NB_GEN)) :
 			# Loading data for each gen
 			data_loader = torch.utils.data.DataLoader(dataset, batch_size=self.BATCH, shuffle=True)
-			# Train
+			# Train (add multiprocessing)
 			for n in tqdm(range(self.NB_SEEDER)) :
 				# switch torch model to train mode
 				self.SEEDER_LIST[n].train()
 				for batch_idx, (data, target) in enumerate(data_loader) :
 					# vectorization
 					x = data.reshape(self.BATCH,-1)
+					y_ = target.reshape(self.BATCH,-1)
 					# calculate
 					output = self.SEEDER_LIST[n](x.to(self.DEVICE))
 					# train
-					self.train(output, target.to(self.DEVICE), g, n, 0, batch_idx)
+					self.train(output, y_.to(self.DEVICE), g, n, 0, batch_idx)
 					if batch_idx == self.NB_E_P_G :
 						break
 						# evaluate
+						"""
+						*** ADD POSSIBILITY TO CHOOSE A CUSTOM METRICS
+						"""
 						supp_factor = self.predict(data.to(self.DEVICE), n)
 			self.add_checkpoint(g)
 			# selection
@@ -274,10 +312,10 @@ if __name__ == '__main__' :
 	Transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.1307,), (0.3081,))]) # torchvision.transforms.Resize((14,14))
 	mnist_dataset = torchvision.datasets.MNIST(data_path, download=True, transform=Transforms)
 	## parameter (not default)
-	NB_EPOCH = 2
-	TRAIN_LENGHT = int(mnist_dataset.train_data.shape[0] * NB_EPOCH)/25
+	NB_EPOCH = 5
+	TRAIN_LENGHT = int(mnist_dataset.train_data.shape[0] * NB_EPOCH)
 	## load model
-	model = FunctionalFilet(nb_seed=4, train_size=TRAIN_LENGHT, TYPE='class')
+	model = FunctionalFilet(nb_seed=25, train_size=TRAIN_LENGHT, TYPE='class')
 	## Train
 	model.fit(mnist_dataset)
 	## predict (note : linearize image !)
