@@ -28,13 +28,17 @@ If GEN = 0, equivalent of no evolution during training : only SGD
 if NB_BATCH > NB_BATCH/GEN, equivalent of no SGD : only evolution
 """
 class FunctionalFilet():
-	def __init__(self, io=(64,16), batch=25, nb_gen=100, nb_seed=9, alpha=0.9, train_size=1e6, nb_epoch=10, NAMED_MEMORY=None, TYPE="class", INVERT=False, DEVICE=True, TIME_DEPENDANT = False):
+	def __init__(self, io=(64,16), batch=25, nb_gen=100, nb_seed=9, alpha=0.9, train_size=1e6, nb_epoch=10, NAMED_MEMORY=None, TYPE="class", INVERT=False, DEVICE=True, TIME_DEPENDANT = False, GDchain="standard", lossF = "standard", metrics='standard', ):
 		print("[INFO] Starting System...")
 		# parameter
 		self.IO =  io
-		if INVERT :
+		if INVERT==True :
 			# Feature augmentation (ex : after bottleneck)
 			self.IO = tuple(reversed(self.IO))
+		elif INVERT=="same":
+			# f: R -> R
+			io = int(np.sqrt(np.prod(io))) # geometric mean
+			self.IO = (io,io)
 		self.BATCH = batch
 		self.NB_GEN = nb_gen
 		self.NB_SEEDER = max(4,int(np.rint(np.sqrt(nb_seed))**2))
@@ -67,6 +71,7 @@ class FunctionalFilet():
 		print("[INFO] ENN Generated!")
 		# training parameter
 		print("[INFO] Generate training parameters for population..")
+		self.GDchain, self.lossF, self.metrics = GDchain, lossF, metrics
 		self.optimizer, self.criterion = None, None
 		self.update_model()
 		print("[INFO] Generate evolution variable for population..")
@@ -84,22 +89,28 @@ class FunctionalFilet():
 		# refresh memory
 		del self.optimizer
 		del self.criterion
-		# torch
-		self.optimizer = [torch.optim.Adam(s.parameters()) for s in self.SEEDER_LIST]
-		if self.TYPE == "class" :
-			self.criterion = [nn.CrossEntropyLoss().to(self.DEVICE) for n in range(self.NB_SEEDER)]
+		## Gradient descent (chain rule) algo
+		if self.GDchain == 'standard' :
+			self.optimizer = [torch.optim.Adam(s.parameters()) for s in self.SEEDER_LIST]
 		else :
-			self.criterion = [nn.SmoothL1Loss().to(self.DEVICE) for n in range(self.NB_SEEDER)] # regression / RL
+			# custom sgd algorithm
+			self.optimizer = [self.GDchain.copy()(s.parameters()) for s in self.SEEDER_LIST]
+		## Error function
+		if self.lossF == 'standard' :
+			if self.TYPE == "class" :
+				self.criterion = [nn.CrossEntropyLoss().to(self.DEVICE) for n in range(self.NB_SEEDER)]
+			else :
+				self.criterion = [nn.SmoothL1Loss().to(self.DEVICE) for n in range(self.NB_SEEDER)] # regression / RL
+		else :
+			# custom loss function
+			self.criterion = [self.lossF().copy().to(self.DEVICE) for n in range(self.NB_SEEDER)]
 		# memory
 		if self.NAMED_M == None :
 			self.memory = {"X_train":None, "Y_train":None, "X_test":None, "Y_test":None}
 		else :
 			self.memory = [ReplayMemory(1024, self.NAMED_M) for n in range(self.NB_SEEDER)]
 
-		"""
-		*** ADD POSSIBILITY TO CHOOSE A CUSTOM OPTIMIZER
-		"""
-		
+	# Particular case : RL
 	def step(self, INPUT, index=0, message=False):
 		in_tensor = torch.tensor(INPUT, dtype=torch.float)
 		if message : print("[INFO] Switch to inference mode for model:"+str(index))
@@ -163,7 +174,7 @@ class FunctionalFilet():
 	
 	def add_checkpoint(self, gen):
 		i = 0
-		for s in self.SEEDER_LIST :
+		for s in self.SEEDER_LIST[:self.NB_CONTROL+self.NB_EVOLUTION] :
 			self.checkpoint += [{'GEN':gen,'IDX_SEED':i, 'GRAPH':s.net, 'NETWORKS': s.state_dict()}]
 			i+=1
 
@@ -258,7 +269,7 @@ class FunctionalFilet():
 				# switch torch model to train mode
 				self.SEEDER_LIST[n].train()
 				for batch_idx, (data, target) in enumerate(data_loader) :
-					# vectorization
+					# 1D vectorization
 					x = data.reshape(self.BATCH,-1)
 					y_ = target.reshape(self.BATCH,-1)
 					# calculate
@@ -268,10 +279,12 @@ class FunctionalFilet():
 					if batch_idx == self.NB_E_P_G :
 						break
 						# evaluate
-						"""
-						*** ADD POSSIBILITY TO CHOOSE A CUSTOM METRICS
-						"""
-						supp_factor = self.predict(data.to(self.DEVICE), n)
+						out = self.predict(data.to(self.DEVICE), n)
+						if self.metrics == "standard" :
+							supp_factor = 1
+						# custom metrics
+						else :
+							supp_factor = self.metrics(out)
 			self.add_checkpoint(g)
 			# selection
 			self.selection(g, supp_factor = 1)

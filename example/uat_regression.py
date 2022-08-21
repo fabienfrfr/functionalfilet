@@ -1,12 +1,13 @@
 # fabienfrfr 20220819
+
 """
 	Universal Approximation Theorem
 
 This very simple case makes it possible to understand the use of the model in the case 
 of a regression.
 
-In this example, the model is overtrained for a single function, but highlights problems 
-of non-monotonic logical functions (or non-linearly separable, non-connected).
+In this example, the model is overtrained for a single function, but highlights non-monotonic 
+logical functions problems (or non-linearly separable, non-connected).
 
 """
 
@@ -21,9 +22,9 @@ from functionalfilet import model as ff
 f = lambda x : torch.cos(2*x) + x*torch.sin(3*x) + x**0.5
 
 ## ff model
-model = ff.FunctionalFilet(TYPE="regress")
+model = ff.FunctionalFilet(TYPE="regress" , INVERT="same")
 
-## feature/feature
+## feature/feature (f:R -> R)
 X = torch.linspace(0,10,100)[None]
 y = f(X)
 
@@ -38,6 +39,10 @@ for i in range(model.NB_SEEDER):
 	# show curve
 	plt.plot(x,y_,x,y_pred)
 	plt.show(); plt.close()
-	# show correlation
+	# show 'correlation'
 	plt.plot(y_,y_pred)
 	plt.show(); plt.close()
+	# show graph
+	if not(model.SEEDER_LIST[i].control) :
+		model.SEEDER_LIST[i].graph.SHOW_GRAPH(LINK_LAYERS = False)
+		plt.close()

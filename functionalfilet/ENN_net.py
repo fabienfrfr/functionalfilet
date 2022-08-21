@@ -21,6 +21,7 @@ class EvoNeuralNet(nn.Module):
 		self.device = DEVICE
 		self.invert = invert
 		self.stack = stack
+		self.control = control
 		# Input adjustment
 		self.patch_in = lambda x:x
 		# Block
