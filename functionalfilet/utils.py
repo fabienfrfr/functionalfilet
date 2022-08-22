@@ -22,6 +22,12 @@ class ReplayMemory(object):
 	def __len__(self):
 		return len(self.memory)
 
+def F1_Score(label, y_pred):
+	#https://gist.github.com/SuperShinyEyes/dcc68a08ff8b615442e3bc6a9b55a354
+	y_true = F.one_hot(y_true, 2).to(torch.float32)
+	y_pred = F.softmax(y_pred, dim=1)
+	
+
 class CTRL_NET(nn.Module):
 	def __init__(self, IO, device):
 		super(CTRL_NET, self).__init__()

@@ -8,6 +8,8 @@ of a regression.
 In this example, the model is overtrained for a single function, but highlights problems 
 of non-monotonic logical functions (or non-linearly separable, non-connected).
 
+https://machinelearningmastery.com/types-of-classification-in-machine-learning/
+
 """
 
 ## package

@@ -13,7 +13,7 @@ logical functions problems (or non-linearly separable, non-connected).
 
 ## package
 import torch
-import pylab as plt
+import numpy as np, pylab as plt
 
 ## model import
 from functionalfilet import model as ff 
@@ -22,25 +22,36 @@ from functionalfilet import model as ff
 f = lambda x : torch.cos(2*x) + x*torch.sin(3*x) + x**0.5
 
 ## ff model
-model = ff.FunctionalFilet(TYPE="regress" , INVERT="same")
+model = ff.FunctionalFilet(train_size=1e4, TYPE="regress", INVERT="same")#, multiprocessing=True)
 
 ## feature/feature (f:R -> R)
-X = torch.linspace(0,10,100)[None]
+N = 2
+X = torch.cat([torch.linspace(i,10+i,100)[None] for i in range(N)])
 y = f(X)
 
 ## fit
 model.fit(X,y)
 
+## evolution of predict
+for i,g in model.test.groupby('IDX_SEED') :
+	evo = np.concatenate([p[None] for p in g.PRED])
+	# first pred batch (1st gen to last gen)
+	for e in evo :
+		plt.plot(e[0])
+	plt.show(); plt.close()
+
 ## predict for all seeder
 x, y_ = X.detach().numpy().squeeze(), y.detach().numpy().squeeze()
 for i in range(model.NB_SEEDER):
-	y_pred = model.predict(X)
+	y_pred = model.predict(X, numpy=True)
 
 	# show curve
-	plt.plot(x,y_,x,y_pred)
+	for n in range(N):
+		plt.plot(x[n],y_[n],x[n],y_pred[n])
 	plt.show(); plt.close()
 	# show 'correlation'
-	plt.plot(y_,y_pred)
+	for n in range(N):
+		plt.plot(y_[n],y_pred[n])
 	plt.show(); plt.close()
 	# show graph
 	if not(model.SEEDER_LIST[i].control) :
