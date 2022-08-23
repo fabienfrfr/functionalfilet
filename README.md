@@ -20,3 +20,7 @@ An Artificial Neural Network Functionalized by Evolution - This model is based o
 	torch
 	torchvision
 	networkx
+	tqdm
+	scikit-learn
+
+See https://github.com/scikit-learn/scikit-learn

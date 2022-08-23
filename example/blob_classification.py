@@ -1,46 +1,56 @@
 # fabienfrfr 20220819
 """
-	Universal Approximation Theorem
+	Blob classification with unbalanced data & cluster
 
 This very simple case makes it possible to understand the use of the model in the case 
-of a regression.
+of a classification.
 
 In this example, the model is overtrained for a single function, but highlights problems 
 of non-monotonic logical functions (or non-linearly separable, non-connected).
 
-https://machinelearningmastery.com/types-of-classification-in-machine-learning/
-
 """
 
 ## package
-import torch, torchvision
-import os
+import os, numpy as np
+import torch, pandas as pd
+from sklearn.datasets import make_classification
+
+import pylab as plt, seaborn as sns
 
 ## model import
 from functionalfilet import model as ff 
 
-## dataset label y / feature x
-data_path = os.path.expanduser('~')+'/Dataset/MNIST'
-Transforms = torchvision.transforms.Compose([torchvision.transforms.Resize((14,14)), torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.1307,), (0.3081,))])
-mnist_dataset = torchvision.datasets.MNIST(data_path, download=True, transform=Transforms)
+# define dataset
+X, y = make_classification(n_samples=1000, n_features=3, n_redundant=0, n_informative=3, n_clusters_per_class=2, n_classes=4, weights=[0.5,0.3,0.15,0.05], random_state=1)
 
-# extract dataset with transform (tips)
-data_loader = torch.utils.data.DataLoader(mnist_dataset, batch_size= mnist_dataset.train_labels.shape[0], shuffle=True)
-for batch_idx, (data, target) in enumerate(data_loader) : None
+# Fast EDA
+df = pd.DataFrame(np.concatenate((y[:,None],X), axis=1), columns=['label','posX','posY', 'posZ'])
+sns.pairplot(df, hue="label"); plt.show()
+plt.close()
 
-# [N, 1, H, L] -> [N, H, L]
-data = data.squeeze()
+# to torch
+X, y = torch.tensor(X, dtype=torch.float), torch.tensor(y).type(torch.LongTensor)
 
 ## ff model
-model = ff.FunctionalFilet()
+model = ff.FunctionalFilet(train_size=1e5, INVERT=True)
+load_name = 'class_20220823_180834'
 
-## fit
-model.fit(data,target)
+## fit (or load)
+path = os.path.expanduser('~')+'/Saved_Model/ff_' + load_name
+if os.path.isdir(path):
+	### LOAD
+	model.load(path)
+else :
+	### FIT
+	model.fit(X,y)
 
-## predict
-y_pred = model.predict(x)
+# predict
+for i in range(len(model.SEEDER_LIST)):
+	y_pred = model.predict(X, index=i)
 
-# show
-import pylab as plt
-plt.plot(x,y,x,y_pred)
-plt.show()
+	# plot the dataset and color the by class label
+	y_max = torch.argmax(y_pred, dim=1).cpu().numpy()
+	for label in np.unique(y_max):
+		row_ix = np.where(y_max == label)[0]
+		plt.scatter(X[row_ix, 0], X[row_ix, 1], label=str(label))
+	plt.show();plt.close()

@@ -4,6 +4,7 @@ import numpy as np
 import torch, torch.nn as nn
 
 import copy
+from collections import namedtuple
 
 # networks construction
 from functionalfilet.graph_eat import GRAPH_EAT
@@ -13,7 +14,7 @@ from functionalfilet.pRNN_net import pRNN
 from functionalfilet.utils import CTRL_NET
 
 class EvoNeuralNet(nn.Module):
-	def __init__(self, IO=(64,16), BATCH=25, DEVICE=torch.device('cpu'), control=False, invert=False, stack=False, graph=None):
+	def __init__(self, IO=(64,16), BATCH=25, DEVICE=torch.device('cpu'), control=False, invert=False, stack=False, graph=None, net=None):
 		super().__init__()
 		# parameter
 		self.io = IO
@@ -29,14 +30,18 @@ class EvoNeuralNet(nn.Module):
 			# graph
 			if graph == None :
 				self.graph = GRAPH_EAT(self.io)
-			else :
+			elif net == None :
 				self.graph = graph
+			else :
+				self.graph = GRAPH_EAT(None, NET=net)
 			self.net = self.graph.NEURON_LIST
 			# pRNN block
 			self.enn_block = pRNN(self.net, self.batch, self.io[0], self.device, self.stack)
 		else :
 			# control net (add possibility to add own model)
 			self.enn_block = CTRL_NET(self.io, self.device)
+			self.graph = namedtuple('graph',('LIST_C'))
+			self.graph.LIST_C = "None"
 			self.net = self.enn_block.net
 		# Output adjustment
 		self.patch_out = lambda x:x

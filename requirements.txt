@@ -6,3 +6,5 @@ matplotlib
 networkx
 tqdm
 scikit-learn
+scikit-datasets
+seaborn

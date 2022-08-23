@@ -12,7 +12,7 @@ logical functions problems (or non-linearly separable, non-connected).
 """
 
 ## package
-import torch
+import torch, os, ast
 import numpy as np, pylab as plt
 
 ## model import
@@ -21,37 +21,49 @@ from functionalfilet import model as ff
 ## function to approximate
 f = lambda x : torch.cos(2*x) + x*torch.sin(3*x) + x**0.5
 
-## ff model
-model = ff.FunctionalFilet(train_size=1e4, TYPE="regress", INVERT="same")#, multiprocessing=True)
-
-## feature/feature (f:R -> R)
+### feature/feature (f:R -> R)
 N = 2
-X = torch.cat([torch.linspace(i,10+i,100)[None] for i in range(N)])
+# Local (linspace) & unlocal (random) correlation
+torch.manual_seed(0) #reproductibility
+X = torch.cat([torch.linspace(i,10+i,100)[None] for i in range(N)]+[10*torch.rand(N,100)])
 y = f(X)
 
-## fit
-model.fit(X,y)
+## ff model
+model = ff.FunctionalFilet(train_size=1e4, TYPE="regress", INVERT="same")#, multiprocessing=True)
+load_name = '0'# 'regress_20220823_134320'
+
+## fit (or load)
+path = os.path.expanduser('~')+'/Saved_Model/ff_' + load_name
+if os.path.isdir(path):
+	### LOAD
+	model.load(path)
+else :
+	### FIT
+	model.fit(X,y)
 
 ## evolution of predict
+fig, ax = plt.subplots()
 for i,g in model.test.groupby('IDX_SEED') :
-	evo = np.concatenate([p[None] for p in g.PRED])
+	evo = np.concatenate([np.array(ast.literal_eval(p))[None] for p in g.PRED])
 	# first pred batch (1st gen to last gen)
 	for e in evo :
-		plt.plot(e[0])
+		ax.plot(e[0])
 	plt.show(); plt.close()
 
 ## predict for all seeder
 x, y_ = X.detach().numpy().squeeze(), y.detach().numpy().squeeze()
-for i in range(model.NB_SEEDER):
-	y_pred = model.predict(X, numpy=True)
+for i in range(len(model.SEEDER_LIST)):
+	y_pred = model.predict(X, index=i, numpy=True)
 
 	# show curve
+	fig, ax = plt.subplots()
 	for n in range(N):
-		plt.plot(x[n],y_[n],x[n],y_pred[n])
+		ax.plot(x[n],y_[n],x[n],y_pred[n])
 	plt.show(); plt.close()
 	# show 'correlation'
+	fig, ax = plt.subplots()
 	for n in range(N):
-		plt.plot(y_[n],y_pred[n])
+		ax.plot(y_[n],y_pred[n])
 	plt.show(); plt.close()
 	# show graph
 	if not(model.SEEDER_LIST[i].control) :

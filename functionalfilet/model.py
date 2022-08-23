@@ -12,7 +12,7 @@ from torch.utils.data import TensorDataset
 
 # system module
 import pickle, datetime, json
-import os, time, copy
+import os, time, copy, ast
 from tqdm import tqdm
 import multiprocessing as mp
 
@@ -29,69 +29,65 @@ If GEN = 0, equivalent of no evolution during training : only SGD
 if NB_BATCH > NB_BATCH/GEN, equivalent of no SGD : only evolution
 """
 class FunctionalFilet():
-	def __init__(self, io=(64,16), batch=25, nb_gen=100, nb_seed=9, alpha=0.9, train_size=1e6, nb_epoch=10, NAMED_MEMORY=None, TYPE="class", INVERT=False, DEVICE=True, TIME_DEPENDANT = False, GDchain="standard", lossF = "standard", metrics='standard', multiprocessing=False, load=False):
+	def __init__(self, io=(64,16), batch=25, nb_gen=100, nb_seed=9, alpha=0.9, train_size=1e6, nb_epoch=10, NAMED_MEMORY=None, TYPE="class", INVERT=False, DEVICE=True, TIME_DEPENDANT = False, GDchain="standard", lossF = "standard", metrics='standard', multiprocessing=False):
 		print("[INFO] Starting System...")
-		if not(load) :
-			# parameter
-			self.IO =  io
-			if INVERT==True :
-				# Feature augmentation (ex : after bottleneck)
-				self.IO = tuple(reversed(self.IO))
-			elif INVERT=="same":
-				# f: R -> R
-				io = int(np.sqrt(np.prod(io))) # geometric mean
-				self.IO = (io,io)
-			self.BATCH = batch
-			self.NB_GEN = nb_gen
-			self.NB_SEEDER = max(4,int(np.rint(np.sqrt(nb_seed))**2))
-			self.ALPHA = alpha # 1-% of predict (not random step)
-			if TYPE == "class" or TYPE == "regress" :
-				self.EPOCH = nb_epoch
-				self.NB_BATCH = int(train_size / self.BATCH)  # nb_batch = (dataset_lenght * nb_epoch) / batch_size
-				self.NB_EPISOD = self.NB_BATCH # only in supervised learning
-				self.NB_E_P_G = int(self.NB_BATCH/self.NB_GEN)
-			else :
-				self.NB_EPISOD = train_size
-				self.NB_E_P_G = int(self.NB_EPISOD/self.NB_GEN)
-			self.TIME_DEP = TIME_DEPENDANT
-			self.TYPE = TYPE
-			self.NAMED_M = NAMED_MEMORY
-			if DEVICE==True :
-				self.DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-			else :
-				self.DEVICE = DEVICE
-			self.INVERT = INVERT
-			print("[INFO] Calculation type : " + self.DEVICE.type)
-			print("[INFO] Generate selection parameters for population..")
-			# evolution param
-			self.NB_CONTROL = int(np.power(self.NB_SEEDER, 1./4))
-			self.NB_EVOLUTION = int(np.sqrt(self.NB_SEEDER)-1) # square completion
-			self.NB_CHALLENGE = int(self.NB_SEEDER - (self.NB_EVOLUTION*(self.NB_EVOLUTION+1) + self.NB_CONTROL))
-			print("[INFO] Generate first evolutionnal neural networks..")
-			self.SEEDER_LIST = [EvoNeuralNet(self.IO, self.BATCH, self.DEVICE, control=True) for n in range(self.NB_CONTROL)]
-			for _n in range(self.NB_SEEDER-self.NB_CONTROL) :
-				self.SEEDER_LIST += [EvoNeuralNet(self.IO, self.BATCH, self.DEVICE, stack=self.TIME_DEP)]
-			print("[INFO] ENN Generated!")
-			# training parameter
-			print("[INFO] Generate training parameters for population..")
-			self.GDchain, self.lossF, self.metrics = GDchain, lossF, metrics
-			self.optimizer, self.criterion = None, None
-			self.update_model()
-			print("[INFO] Generate evolution variable for population..")
-			# selection
-			self.loss = pd.DataFrame(columns=['GEN','IDX_SEED', 'EPISOD', 'N_BATCH', 'LOSS_VALUES'])
-			self.test = pd.DataFrame(columns=['GEN', 'IDX_SEED', 'SCORE', 'TRUE','PRED'])
-			# evolution variable
-			self.PARENTING = [-1*np.ones(self.NB_SEEDER)[None]]
-			self.PARENTING[0][0][:self.NB_CONTROL] = 0
-			# checkpoint & process
-			self.checkpoint = []
-			self.multiprocessing = multiprocessing
-			self.cpuCount = int(os.cpu_count()/2)
-			print("[INFO] Model created!")
+		# parameter
+		self.IO =  io
+		if INVERT==True :
+			# Feature augmentation (ex : after bottleneck)
+			self.IO = tuple(reversed(self.IO))
+		elif INVERT=="same":
+			# f: R -> R
+			io = int(np.sqrt(np.prod(io))) # geometric mean
+			self.IO = (io,io)
+		self.BATCH = batch
+		self.NB_GEN = nb_gen
+		self.NB_SEEDER = max(4,int(np.rint(np.sqrt(nb_seed))**2))
+		self.ALPHA = alpha # 1-% of predict (not random step)
+		if TYPE == "class" or TYPE == "regress" :
+			self.EPOCH = nb_epoch
+			self.NB_BATCH = int(train_size / self.BATCH)  # nb_batch = (dataset_lenght * nb_epoch) / batch_size
+			self.NB_EPISOD = self.NB_BATCH # only in supervised learning
+			self.NB_E_P_G = int(self.NB_BATCH/self.NB_GEN)
 		else :
-			print("[INFO] You are in loading mode !")
-			print("[INFO] Please load saved parameters, the model it's empty..")
+			self.NB_EPISOD = train_size
+			self.NB_E_P_G = int(self.NB_EPISOD/self.NB_GEN)
+		self.TIME_DEP = TIME_DEPENDANT
+		self.TYPE = TYPE
+		self.NAMED_M = NAMED_MEMORY
+		if DEVICE==True :
+			self.DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+		else :
+			self.DEVICE = DEVICE
+		self.INVERT = INVERT
+		print("[INFO] Calculation type : " + self.DEVICE.type)
+		print("[INFO] Generate selection parameters for population..")
+		# evolution param
+		self.NB_CONTROL = int(np.power(self.NB_SEEDER, 1./4))
+		self.NB_EVOLUTION = int(np.sqrt(self.NB_SEEDER)-1) # square completion
+		self.NB_CHALLENGE = int(self.NB_SEEDER - (self.NB_EVOLUTION*(self.NB_EVOLUTION+1) + self.NB_CONTROL))
+		print("[INFO] Generate first evolutionnal neural networks..")
+		self.SEEDER_LIST = [EvoNeuralNet(self.IO, self.BATCH, self.DEVICE, control=True) for n in range(self.NB_CONTROL)]
+		for _n in range(self.NB_SEEDER-self.NB_CONTROL) :
+			self.SEEDER_LIST += [EvoNeuralNet(self.IO, self.BATCH, self.DEVICE, stack=self.TIME_DEP)]
+		print("[INFO] ENN Generated!")
+		# training parameter
+		print("[INFO] Generate training parameters for population..")
+		self.GDchain, self.lossF, self.metrics = GDchain, lossF, metrics
+		self.optimizer, self.criterion = None, None
+		self.update_model()
+		print("[INFO] Generate evolution variable for population..")
+		# selection
+		self.loss = pd.DataFrame(columns=['GEN','IDX_SEED', 'EPISOD', 'N_BATCH', 'LOSS_VALUES'])
+		self.test = pd.DataFrame(columns=['GEN', 'IDX_SEED', 'SCORE', 'TRUE','PRED'])
+		# evolution variable
+		self.PARENTING = [-1*np.ones(self.NB_SEEDER)[None]]
+		self.PARENTING[0][0][:self.NB_CONTROL] = 0
+		# checkpoint & process
+		self.checkpoint = []
+		self.multiprocessing = multiprocessing
+		self.cpuCount = int(os.cpu_count()/2)
+		print("[INFO] Model pre-created!")
 		
 	def update_model(self):
 		# refresh memory
@@ -102,7 +98,7 @@ class FunctionalFilet():
 			self.optimizer = [torch.optim.Adam(s.parameters()) for s in self.SEEDER_LIST]
 		else :
 			# custom sgd algorithm
-			self.optimizer = [self.GDchain.copy()(s.parameters()) for s in self.SEEDER_LIST]
+			self.optimizer = [self.GDchain(s.parameters()) for s in self.SEEDER_LIST]
 		## Error function
 		if self.lossF == 'standard' :
 			if self.TYPE == "class" :
@@ -111,7 +107,7 @@ class FunctionalFilet():
 				self.criterion = [nn.SmoothL1Loss().to(self.DEVICE) for n in range(self.NB_SEEDER)] # regression / RL
 		else :
 			# custom loss function
-			self.criterion = [self.lossF().copy().to(self.DEVICE) for n in range(self.NB_SEEDER)]
+			self.criterion = [self.lossF().to(self.DEVICE) for n in range(self.NB_SEEDER)]
 		# memory (unused for now)
 		if self.NAMED_M == None :
 			self.memory = {"X_train":None, "Y_train":None, "X_test":None, "Y_test":None}
@@ -186,7 +182,7 @@ class FunctionalFilet():
 	def add_checkpoint(self, gen):
 		i = 0
 		for s in self.SEEDER_LIST[:self.NB_CONTROL+self.NB_EVOLUTION] :
-			self.checkpoint += [{'GEN':gen,'IDX_SEED':int(i), 'CONTROL':s.control, 'GRAPH':s.net, 'NETWORKS': s.state_dict()}]
+			self.checkpoint += [{'GEN':gen,'IDX_SEED':int(i), 'CONTROL':s.control, 'GRAPH':s.net, 'LIST_C': s.graph.LIST_C, 'NETWORKS': s.state_dict()}]
 			i+=1
 
 	def selection(self, GEN):
@@ -259,7 +255,7 @@ class FunctionalFilet():
 			data, target = data.to(self.DEVICE, non_blocking=True), target.to(self.DEVICE, non_blocking=True)
 			# 1D vectorization
 			x = data.reshape(self.BATCH,-1)
-			y_ = target.reshape(self.BATCH,-1)	
+			y_ = target.reshape(self.BATCH,-1).squeeze()
 			# calculate
 			output = self.SEEDER_LIST[n](x)
 			# train (note : in supervised learning, episode = batch_idx)
@@ -272,15 +268,13 @@ class FunctionalFilet():
 						R2Score = lambda y,y_pred: 1 - torch.sum((y-y_pred)**2)/torch.sum((y-torch.mean(y))**2)
 						score = R2Score(y_, out)
 					elif self.TYPE == "class" :
-						Precision = lambda  label, y_pred : 1 # TP/(TP+FP)
-						Recall = lambda  label, y_pred : 1 # TP/(TP+FN)
-						F1_Score = lambda label, y_pred : 2*(Precision(label, y_pred)*Recall(label, y_pred))/(Precision(label, y_pred)+Recall(label, y_pred))
+						# adapted for unbalanced data
 						score = F1_Score(y_, out)
 				# custom metrics
 				else :
 					score = self.metrics(out)
 				# save loss (adding input)
-				self.test = self.test.append({'GEN':g, 'IDX_SEED':int(n), 'SCORE':float(score.cpu().detach().numpy()), 'TRUE':y_.cpu().detach().numpy(), 'PRED':out.cpu().detach().numpy()}, ignore_index=True)
+				self.test = self.test.append({'GEN':g, 'IDX_SEED':int(n), 'SCORE':float(score.cpu().detach().numpy()), 'TRUE':y_.cpu().detach().numpy().tolist(), 'PRED':out.cpu().detach().numpy().tolist()}, ignore_index=True)
 				# BREAK DATA LOADER LOOP
 				break
 
@@ -335,6 +329,7 @@ class FunctionalFilet():
 	def finalization(self, supp_param=None, save=True):
 		self.PARENTING = np.concatenate(self.PARENTING).T
 		if save :
+			print("[INFO] Save model...")
 			time = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
 			path = os.path.expanduser('~')+'/Saved_Model/ff_'+ self.TYPE + '_' + time
 			if(not os.path.isdir(path)): os.makedirs(path)
@@ -352,8 +347,10 @@ class FunctionalFilet():
 			param = {k:str(v) for k,v in param.items()}
 			with open(path+os.path.sep+"model_parameter.json", "w") as outfile:
 				json.dump(param, outfile)
+			print("[INFO] The model its saved !")
 	
 	def load(self, folder):
+		print("[INFO] You chose to load model : " + folder)
 		list_file = os.listdir(folder)
 		# extract path
 		checkpoint_path = folder + os.path.sep + list_file[np.argmax(["checkpoints" in f for f in list_file])]
@@ -362,37 +359,25 @@ class FunctionalFilet():
 		evolution_path = folder + os.path.sep + list_file[np.argmax(["phylogenic" in f for f in list_file])]
 		param_path = folder + os.path.sep + list_file[np.argmax(["parameter" in f for f in list_file])]
 		# basic parameter :
-		self.parameter = json.load(param_path)
+		with open(param_path) as f :
+			self.parameter = json.load(f)
+		self.IO = ast.literal_eval(self.parameter['io'])
+		self.RealIO = ast.literal_eval(self.parameter['realIO'])
+		self.BATCH = ast.literal_eval(self.parameter['batch'])
 		# evolution
 		self.PARENTING = np.load(evolution_path)
 		# score
 		self.loss = pd.read_csv(loss_path)
+		with open(test_path) as f: col_names = f.readline().split('\n')[0].split(';')
+		col_type = {col : ast.literal_eval for col in col_names}
 		self.test = pd.read_csv(test_path)
 		# checkpoint
 		self.checkpoint = pd.read_pickle(checkpoint_path)
-		# seeder constructor !!!!!!!!!!!!!!!! TO DO
+		## seeder
 		last = self.checkpoint[self.checkpoint.GEN == self.checkpoint.GEN.max()]
-		self.SEEDER_LIST = [EvoNeuralNet(load=True, control=l.CONTROL, graph=l.GRAPH, net=l.NETWORKS) for l in last]
-
-### basic exemple
-if __name__ == '__main__' :
-	import torchvision
-	data_path = os.path.expanduser('~')+'/Dataset/MNIST'
-	Transforms = torchvision.transforms.Compose([torchvision.transforms.ToTensor(), torchvision.transforms.Normalize((0.1307,), (0.3081,))]) # torchvision.transforms.Resize((14,14))
-	mnist_dataset = torchvision.datasets.MNIST(data_path, download=True, transform=Transforms)
-	## parameter (not default)
-	NB_EPOCH = 5
-	TRAIN_LENGHT = int(mnist_dataset.train_data.shape[0] * NB_EPOCH)
-	## load model
-	model = FunctionalFilet(nb_seed=25, train_size=TRAIN_LENGHT, TYPE='class')
-	## Train
-	model.fit(mnist_dataset)
-	## predict (note : linearize image !)
-	BATCH = model.BATCH
-	"""
-	X, Y = mnist_dataset.train_data, mnist_dataset.train_labels
-	x, y = X[:BATCH,::2,::2].reshape(BATCH,-1), Y[:BATCH]
-	y_pred = model.predict(x,0, True)
-	y_pred = model.predict(x,1, True)
-	print("[INFO] Labels is : "+str(y))
-	"""
+		self.SEEDER_LIST = []
+		for idx, ckpt in last.iterrows():
+			self.SEEDER_LIST += [EvoNeuralNet(self.IO, self.BATCH, self.DEVICE, control=ckpt.CONTROL, graph=True, net=(self.IO, ckpt.GRAPH, ckpt.LIST_C))]
+			self.SEEDER_LIST[-1].checkIO(*self.RealIO)
+			self.SEEDER_LIST[-1].load_state_dict(ckpt.NETWORKS)
+		print("[INFO] The model its loaded !")
