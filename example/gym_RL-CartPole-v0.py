@@ -1,12 +1,12 @@
 # fabienfrfr 20220819
 """
-	Universal Approximation Theorem
+	Reinforcement Q-learning
 
 This very simple case makes it possible to understand the use of the model in the case 
-of a regression.
+of a markov decision process.
 
-In this example, the model is overtrained for a single function, but highlights problems 
-of non-monotonic logical functions (or non-linearly separable, non-connected).
+In this example, the model is adapted for unsupervised learning. It's highlights use
+decomposition model (step per step) and dilemna problematic's in evolution case.
 
 """
 

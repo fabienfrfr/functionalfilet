@@ -5,8 +5,8 @@
 This very simple case makes it possible to understand the use of the model in the case 
 of a classification.
 
-In this example, the model is overtrained for a single function, but highlights problems 
-of non-monotonic logical functions (or non-linearly separable, non-connected).
+In this example, the model is overtrained, but highlights problems of overlapping
+and unbalanced data.
 
 """
 

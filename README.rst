@@ -1,6 +1,6 @@
+.. -*- mode: rst -*-
 
-
-![FF Logo](/branding/logo.png)
+.. image:: /branding/logo.png
 
 ---
 
@@ -22,5 +22,6 @@ An Artificial Neural Network Functionalized by Evolution - This model is based o
 	networkx
 	tqdm
 	scikit-learn
+	seaborn
 
 See https://github.com/scikit-learn/scikit-learn
