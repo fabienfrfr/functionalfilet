@@ -91,6 +91,14 @@ else :
 	model.finalization()
 
 ## Testing
+for n in range(len(model.SEEDER_LIST)):
+	print("[INFO] Render prediction of seeder : " +str(n))
+	new_state = env.reset()
+	done = False
+	while not done :
+		action = model.predict(new_state[None], n, message=False, numpy=True, argmax=True)[0]
+		new_state, reward, done, info = env.step(action)
+		env.render()
 
 ## Close environment
 env.close()

@@ -4,7 +4,7 @@
 |GitHub|_ |PyPi|_ |DOI|_
 
 
-.. |GitHub| image:: https://img.shields.io/github/downloads/fabienfrfr/functionalfilet/total
+.. |GitHub| image:: https://img.shields.io/github/v/release/fabienfrfr/functionalfilet
 .. _GitHub: https://github.com/fabienfrfr/functionalfilet
 
 .. |PyPi| image:: https://img.shields.io/pypi/v/functionalfilet
