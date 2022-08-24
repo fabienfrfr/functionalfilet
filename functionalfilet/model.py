@@ -285,7 +285,7 @@ class FunctionalFilet():
 						score = F1_Score(y_, out)
 				# custom metrics
 				else :
-					score = self.metrics(out)
+					score = self.metrics(y_, out)
 				# save loss (adding input)
 				self.test = self.test.append({'GEN':g, 'IDX_SEED':int(n), 'SCORE':float(score.cpu().detach().numpy()), 'TRUE':y_.cpu().detach().numpy().tolist(), 'PRED':out.cpu().detach().numpy().tolist()}, ignore_index=True)
 				# BREAK DATA LOADER LOOP
