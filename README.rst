@@ -1,27 +1,132 @@
 .. -*- mode: rst -*-
 
-.. image:: /branding/logo.png
 
----
-
-###### Attribution required : Fabien Furfaro (CC 4.0 BY NC ND SA)
-
-(Work in developpement)
-
-See the notebook [here](/.ipynb) (Work in progress)
-
-An Artificial Neural Network Functionalized by Evolution - This model is based on this [paper](https://arxiv.org/abs/2205.10118).
+|GitHub|_ |PyPi|_ |DOI|_
 
 
-**Requirements :**
+.. |GitHub| image:: https://img.shields.io/github/downloads/fabienfrfr/functionalfilet/total
+.. _GitHub: https://github.com/fabienfrfr/functionalfilet
 
-	numpy
-	pandas
-	torch
-	torchvision
-	networkx
-	tqdm
-	scikit-learn
-	seaborn
+.. |PyPi| image:: https://img.shields.io/pypi/v/functionalfilet
+.. _PyPi: https://pypi.org/project/functionalfilet
 
-See https://github.com/scikit-learn/scikit-learn
+
+.. |DOI| image:: https://img.shields.io/pypi/v/functionalfilet
+.. _DOI: https://arxiv.org/abs/2205.10118
+
+
+.. |PythonMinVersion| replace:: 3.5
+
+
+.. image:: https://raw.githubusercontent.com/fabienfrfr/functionalfilet/main/branding/logo.png
+  :target: https://pypi.org/project/functionalfilet/
+
+
+**Functional Filet** is a Python module for machine learning build on top of Pytorch.
+
+This project explores a new method of constructing linear neural networks using evolutionary algorithms and graphs with gradient descent for adjustment of network weights.
+
+More details in the Arxiv preprint `An Artificial Neural Network Functionalized by Evolution <https://arxiv.org/abs/2205.10118>`__ (model based).
+
+Installation
+------------
+
+Dependencies
+~~~~~~~~~~~~
+
+Functional-Filet requires:
+
+- Python (>= |PythonMinVersion|)
+- NumPy
+- Pandas
+- PyTorch
+- Torchvision
+- Matplotlib
+- Networkx
+
+Optionally, you need:
+
+- Scikit-learn
+- Seaborn
+- Gym
+
+=======
+
+Functional-Filet is stable only from version 0.5.0, any previous version corresponds to the development phase.
+
+However, there are several possible optimizations, in particular on the restructuring of *Torch* tensors in Python which could be done in C++. For this, it is possible that there will be several code modifications in the future.
+
+
+The documentation includes more detailed `installation and examples instructions <https://github.com/fabienfrfr/functionalfilet/blob/main/doc/notebook.ipynb>`_.
+
+
+User installation
+~~~~~~~~~~~~~~~~~
+
+If you already have a working installation of numpy and pytorch,
+the easiest way to install scikit-learn is using ``pip``::
+
+    python3 -m pip install functionalfilet
+
+
+Development
+-----------
+
+We welcome new contributors of all experience levels.
+
+Important links
+~~~~~~~~~~~~~~~
+
+- Official source code repo: https://github.com/fabienfrfr/functionalfilet
+- Download releases: https://pypi.org/project/functionalfilet
+
+Source code
+~~~~~~~~~~~
+
+You can check the latest sources with the command::
+
+    git clone https://github.com/fabienfrfr/functionalfilet.git
+
+
+Utilization
+-----------
+
+Once installed, if we consider two variables *feature X* and *label y* already executed upstream of the code, here is a simple example of use in the case of a classification problem::
+
+	# package
+	from functionalfilet import model as ff 
+	# init model
+	model = ff.FunctionalFilet()
+	# train
+	model.fit(X,y)
+	# test
+	y_pred = model.predict(X, index=seeder_idx)
+
+
+Existing code
+~~~~~~~~~~~~~
+
+There is in the *example* directory of the git, several code to play with the learning parameters in simple cases. A brief summary is described at the top of each file.
+
+.. code-block:: bash
+	python3 -m IPython
+	# universal approximation theorem
+	run example/uat_regression.py
+	# classification with overlapping and unbalance
+	run example/blob_classification.py
+	# reinforcment leaning with time dependancy
+	run example/gym_RL-CartPole-v0.py
+
+Citation
+~~~~~~~~
+If you take inspiration from my machine learning algorithm for a scientific publication, we would appreciate citations: 
+
+.. code-block:: bash
+	@article{furfaro2022artificial,
+	title={An Artificial Neural Network Functionalized by Evolution},
+	author={Furfaro, Fabien and Bar-Hen, Avner and Berthelot, Geoffroy},
+	journal={arXiv preprint arXiv:2205.10118},
+	year={2022}
+	}
+
+**Attribution required : Fabien Furfaro (CC 4.0 BY NC ND SA)**

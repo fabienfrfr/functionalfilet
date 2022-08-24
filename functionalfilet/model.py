@@ -60,6 +60,7 @@ class FunctionalFilet():
 		else :
 			self.DEVICE = DEVICE
 		self.INVERT = INVERT
+		self.RealIO = None
 		print("[INFO] Calculation type : " + self.DEVICE.type)
 		print("[INFO] Generate selection parameters for population..")
 		# evolution param
@@ -88,7 +89,10 @@ class FunctionalFilet():
 		self.multiprocessing = multiprocessing
 		self.cpuCount = int(os.cpu_count()/2)
 		print("[INFO] Model pre-created!")
-		
+
+	def set_IO(self, x):
+		self.RealIO = x
+
 	def update_model(self):
 		# refresh memory
 		del self.optimizer
@@ -108,7 +112,7 @@ class FunctionalFilet():
 		else :
 			# custom loss function
 			self.criterion = [self.lossF().to(self.DEVICE) for n in range(self.NB_SEEDER)]
-		# memory (unused for now)
+		# memory (unused in supervised learning)
 		if self.NAMED_M == None :
 			self.memory = {"X_train":None, "Y_train":None, "X_test":None, "Y_test":None}
 		else :
@@ -116,15 +120,20 @@ class FunctionalFilet():
 
 	# Particular case : RL
 	def step(self, INPUT, index=0, message=False):
-		in_tensor = torch.tensor(INPUT, dtype=torch.float)
+		if isinstance(INPUT, torch.Tensor) :
+			in_tensor = INPUT.type(torch.float)
+		else :
+			in_tensor = torch.tensor(INPUT, dtype=torch.float)
+		# device
+		in_tensor = in_tensor.to(self.DEVICE)
 		if message : print("[INFO] Switch to inference mode for model:"+str(index))
 		# activate all link
 		self.SEEDER_LIST[index].eval()
 		out_probs = self.SEEDER_LIST[index](in_tensor)
 		# exploration dilemna
-		DILEMNA = np.squeeze(out_probs.detach().numpy())
+		DILEMNA = np.squeeze(out_probs.cpu().detach().numpy())
 		if DILEMNA.sum() == 0 or str(DILEMNA.sum()) == 'nan' :
-			out_choice = np.random.randint(self.IO[1])
+			out_choice = np.random.randint(self.RealIO[1])
 		else :
 			if DILEMNA.min() < 0 : DILEMNA = DILEMNA-DILEMNA.min() # order garanty
 			## ADD dispersion between near values (ex : q-table, values is near)
@@ -133,27 +142,31 @@ class FunctionalFilet():
 			order = np.exp(order)
 			# probability
 			p_norm = order/order.sum()
-			out_choice = np.random.choice(self.IO[1], p=p_norm)
+			out_choice = np.random.choice(self.RealIO[1], p=p_norm)
 		if message : print("[INFO] Chosen prediction : " + str(out_choice))
 		return out_choice
 	
-	def predict(self, INPUT, index=0, message=False, numpy=False):
+	def predict(self, INPUT, index=0, message=True, numpy=False, argmax=False):
 		if isinstance(INPUT, torch.Tensor) :
 			in_tensor = INPUT.type(torch.float)
 		else :
 			in_tensor = torch.tensor(INPUT, dtype=torch.float)
 		# device
 		in_tensor = in_tensor.to(self.DEVICE)
+		shape = in_tensor.shape
 		# extract prob
 		if message : print("[INFO] Switch to inference mode for model:"+str(index))
 		self.SEEDER_LIST[index].eval()
-		out_probs = self.SEEDER_LIST[index](in_tensor)
-		if self.TYPE != "regress":
-			out = torch.argmax(out_probs, dim=1)
+		if message and (shape[0]>self.BATCH) : 
+			print("[INFO] Input size dimension batch it's superior of model capacity")
+		if (shape[0]<= self.BATCH) :
+			out_probs = self.SEEDER_LIST[index](in_tensor)
 		else :
-			out = out_probs
-		if message : print("[INFO] Prediction : " + str(out))
-		out = out_probs.squeeze()
+			in_tensor = torch.split(in_tensor, self.BATCH)
+			out_probs = torch.cat([self.SEEDER_LIST[index](i) for i in in_tensor])
+		out = out_probs #.squeeze()
+		if argmax :
+			out = torch.argmax(out, dim=1)
 		if numpy :
 			return out.cpu().detach().numpy()
 		return out
@@ -206,7 +219,7 @@ class FunctionalFilet():
 			relativeLOSS = (TailLoss-TailLoss.min())/(TailLoss.max()-TailLoss.min())
 			# score metric normalization (if necessary)
 			relativeSCOR = (sub_test.SCORE - sub_test.SCORE.min()) / (sub_test.SCORE.max() - sub_test.SCORE.min())
-			supp_factor[list(sub_test.IDX_SEED.values)] = relativeSCOR.values
+			supp_factor[list(sub_test.IDX_SEED.astype(int).values)] = relativeSCOR.values
 		else :
 			relativeLOSS = TailLoss
 		# coeffect, belong to [0,3]
@@ -262,7 +275,7 @@ class FunctionalFilet():
 			self.train(output, y_, g, n, batch_idx, batch_idx)
 			if batch_idx == self.NB_E_P_G - 1 :
 				# evaluate test error
-				out = self.predict(data, n)
+				out = self.predict(data, n, message=False)
 				if self.metrics == "standard" :
 					if self.TYPE == "regress" :
 						R2Score = lambda y,y_pred: 1 - torch.sum((y-y_pred)**2)/torch.sum((y-torch.mean(y))**2)
@@ -326,7 +339,7 @@ class FunctionalFilet():
 		# finalization
 		self.finalization()
 
-	def finalization(self, supp_param=None, save=True):
+	def finalization(self, save=True):
 		self.PARENTING = np.concatenate(self.PARENTING).T
 		if save :
 			print("[INFO] Save model...")

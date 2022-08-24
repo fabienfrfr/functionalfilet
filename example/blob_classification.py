@@ -25,6 +25,7 @@ X, y = make_classification(n_samples=1000, n_features=3, n_redundant=0, n_inform
 
 # Fast EDA
 df = pd.DataFrame(np.concatenate((y[:,None],X), axis=1), columns=['label','posX','posY', 'posZ'])
+print("[INFO] EDA : Pairplot of small dataset.")
 sns.pairplot(df, hue="label"); plt.show()
 plt.close()
 
@@ -47,7 +48,6 @@ else :
 # predict
 for i in range(len(model.SEEDER_LIST)):
 	y_pred = model.predict(X, index=i)
-
 	# plot the dataset and color the by class label
 	y_max = torch.argmax(y_pred, dim=1).cpu().numpy()
 	for label in np.unique(y_max):

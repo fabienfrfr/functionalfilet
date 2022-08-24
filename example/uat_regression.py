@@ -30,7 +30,7 @@ y = f(X)
 
 ## ff model
 model = ff.FunctionalFilet(train_size=1e4, TYPE="regress", INVERT="same")#, multiprocessing=True)
-load_name = '0'# 'regress_20220823_134320'
+load_name = 'regress_20220823_134320'
 
 ## fit (or load)
 path = os.path.expanduser('~')+'/Saved_Model/ff_' + load_name
@@ -42,8 +42,9 @@ else :
 	model.fit(X,y)
 
 ## evolution of predict
-fig, ax = plt.subplots()
 for i,g in model.test.groupby('IDX_SEED') :
+	print("[INFO] Predict evolution training of seeder : " + str(i))
+	fig, ax = plt.subplots()
 	evo = np.concatenate([np.array(ast.literal_eval(p))[None] for p in g.PRED])
 	# first pred batch (1st gen to last gen)
 	for e in evo :
@@ -57,15 +58,18 @@ for i in range(len(model.SEEDER_LIST)):
 
 	# show curve
 	fig, ax = plt.subplots()
+	print("[INFO] Predict curve of seeder : " + str(i))
 	for n in range(N):
 		ax.plot(x[n],y_[n],x[n],y_pred[n])
 	plt.show(); plt.close()
 	# show 'correlation'
 	fig, ax = plt.subplots()
+	print("[INFO] Correlation curve of seeder : " + str(i))
 	for n in range(N):
 		ax.plot(y_[n],y_pred[n])
 	plt.show(); plt.close()
 	# show graph
 	if not(model.SEEDER_LIST[i].control) :
+		print("[INFO] Neural network graph of seeder : " + str(i))
 		model.SEEDER_LIST[i].graph.SHOW_GRAPH(LINK_LAYERS = False)
 		plt.close()

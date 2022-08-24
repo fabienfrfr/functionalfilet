@@ -1,16 +1,14 @@
 # 20220810 fabienfrfr
 from setuptools import setup, find_packages
-import codecs
 import os
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-with codecs.open(os.path.join(here, "README.md"), encoding="utf-8") as fh:
-    long_description = "\n" + fh.read()
+with open(os.path.join(here, "README.rst")) as fh :
+    long_description = fh.read()
 
 VERSION = '0.1.0'
 DESCRIPTION = 'Evolutionnary Neural Network Model with PyTorch'
-LONG_DESCRIPTION = 'A package based on the article : An Artificial Neural Network Functionalized by Evolution'
 
 # Setting up
 setup(
@@ -19,10 +17,9 @@ setup(
     author="FabienFrfr (Fabien Furfaro)",
     author_email="<fabien.furfaro@gmail.com>",
     description=DESCRIPTION,
-    long_description_content_type="text/markdown",
     long_description=long_description,
     packages=find_packages(),
-    install_requires=['numpy', 'pandas', 'torch', 'torchvision', 'matplotlib', 'networkx', 'tqdm','scikit-learn', 'scikit-datasets', 'seaborn'],
+    install_requires=['numpy', 'pandas', 'torch', 'torchvision', 'matplotlib', 'networkx', 'tqdm','scikit-learn', 'scikit-datasets', 'seaborn', 'gym'],
     keywords=['python', 'pytorch', 'graph', 'machine learning', 'evolution'],
     classifiers=[
         "Development Status :: 1 - Planning",
