@@ -11,7 +11,7 @@
 .. _PyPi: https://pypi.org/project/functionalfilet
 
 
-.. |DOI| image:: https://img.shields.io/pypi/v/functionalfilet
+.. |DOI| image:: https://img.shields.io/badge/arXiv-AANNFE-%3CCOLOR%3E.svg
 .. _DOI: https://arxiv.org/abs/2205.10118
 
 
@@ -106,9 +106,8 @@ Once installed, if we consider two variables *feature X* and *label y* already e
 Existing code
 ~~~~~~~~~~~~~
 
-There is in the *example* directory of the git, several code to play with the learning parameters in simple cases. A brief summary is described at the top of each file.
+There is in the *example* directory of the git, several code to play with the learning parameters in simple cases. A brief summary is described at the top of each file::
 
-.. code-block:: bash
 	python3 -m IPython
 	# universal approximation theorem
 	run example/uat_regression.py
@@ -119,9 +118,8 @@ There is in the *example* directory of the git, several code to play with the le
 
 Citation
 ~~~~~~~~
-If you take inspiration from my machine learning algorithm for a scientific publication, we would appreciate citations: 
+If you take inspiration from my machine learning algorithm for a scientific publication, we would appreciate citations::
 
-.. code-block:: bash
 	@article{furfaro2022artificial,
 	title={An Artificial Neural Network Functionalized by Evolution},
 	author={Furfaro, Fabien and Bar-Hen, Avner and Berthelot, Geoffroy},
