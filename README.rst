@@ -11,11 +11,12 @@
 .. _PyPi: https://pypi.org/project/functionalfilet
 
 
-.. |DOI| image:: https://img.shields.io/badge/arXiv-AANNFE-%3CCOLOR%3E.svg
+.. |DOI| image:: https://img.shields.io/badge/arXiv-ANNFE-%3CCOLOR%3E.svg
 .. _DOI: https://arxiv.org/abs/2205.10118
 
 
 .. |PythonMinVersion| replace:: 3.5
+.. |PyTorchMinVersion| replace:: 1.0.0
 
 
 .. image:: https://raw.githubusercontent.com/fabienfrfr/functionalfilet/main/branding/logo.png
@@ -39,7 +40,7 @@ Functional-Filet requires:
 - Python (>= |PythonMinVersion|)
 - NumPy
 - Pandas
-- PyTorch
+- PyTorch (>= |PyTorchMinVersion|)
 - Torchvision
 - Matplotlib
 - Networkx

@@ -29,7 +29,7 @@ If GEN = 0, equivalent of no evolution during training : only SGD
 if NB_BATCH > NB_BATCH/GEN, equivalent of no SGD : only evolution
 """
 class FunctionalFilet():
-	def __init__(self, io=(64,16), batch=25, nb_gen=100, nb_seed=9, alpha=0.9, train_size=1e6, nb_epoch=10, NAMED_MEMORY=None, TYPE="class", INVERT=False, DEVICE=True, TIME_DEPENDANT = False, GDchain="standard", lossF = "standard", metrics='standard', multiprocessing=False):
+	def __init__(self, io=(64,16), batch=25, nb_gen=100, nb_seed=9, alpha=0.9, train_size=1e6, NAMED_MEMORY=None, TYPE="class", INVERT=False, DEVICE=True, TIME_DEPENDANT = False, GDchain="standard", lossF = "standard", metrics='standard', multiprocessing=False):
 		print("[INFO] Starting System...")
 		# parameter
 		self.IO =  io
@@ -45,7 +45,6 @@ class FunctionalFilet():
 		self.NB_SEEDER = max(4,int(np.rint(np.sqrt(nb_seed))**2))
 		self.ALPHA = alpha # 1-% of predict (not random step)
 		if TYPE == "class" or TYPE == "regress" :
-			self.EPOCH = nb_epoch
 			self.NB_BATCH = int(train_size / self.BATCH)  # nb_batch = (dataset_lenght * nb_epoch) / batch_size
 			self.NB_EPISOD = self.NB_BATCH # only in supervised learning
 			self.NB_E_P_G = int(self.NB_BATCH/self.NB_GEN)
