@@ -119,12 +119,12 @@ class FunctionalFilet():
 
 	# Particular case : RL
 	def step(self, INPUT, index=0, message=False):
-		if isinstance(INPUT, torch.Tensor) :
-			in_tensor = INPUT.type(torch.float)
-		else :
-			in_tensor = torch.tensor(INPUT, dtype=torch.float)
+		in_tensor = self.to_tensor(INPUT).type(torch.float)
 		# device
 		in_tensor = in_tensor.to(self.DEVICE)
+		# linearize
+		shape = tuple(in_tensor.shape)
+		in_tensor = in_tensor.reshape(shape[0],-1)
 		if message : print("[INFO] Switch to inference mode for model:"+str(index))
 		# activate all link
 		self.SEEDER_LIST[index].eval()
@@ -146,13 +146,12 @@ class FunctionalFilet():
 		return out_choice
 	
 	def predict(self, INPUT, index=0, message=True, numpy=False, argmax=False):
-		if isinstance(INPUT, torch.Tensor) :
-			in_tensor = INPUT.type(torch.float)
-		else :
-			in_tensor = torch.tensor(INPUT, dtype=torch.float)
+		in_tensor = self.to_tensor(INPUT).type(torch.float)
 		# device
 		in_tensor = in_tensor.to(self.DEVICE)
-		shape = in_tensor.shape
+		# linearize
+		shape = tuple(in_tensor.shape)
+		in_tensor = in_tensor.reshape(shape[0],-1)
 		# extract prob
 		if message : print("[INFO] Switch to inference mode for model:"+str(index))
 		self.SEEDER_LIST[index].eval()
@@ -290,8 +289,15 @@ class FunctionalFilet():
 				# BREAK DATA LOADER LOOP
 				break
 
+	def to_tensor(self, X):
+		if isinstance(X, torch.Tensor) :
+			return X
+		else :
+			return torch.tensor(X)
+
 	def fit(self, X, y, sample_weight=None):
 		### SUPERVISED TRAIN
+		X,y = self.to_tensor(X), self.to_tensor(y)
 		# data real shape
 		shape = tuple(X.shape)
 		nb_sample, input_size = shape[0], np.prod(shape[1:])
@@ -301,6 +307,7 @@ class FunctionalFilet():
 			output_size = torch.prod(torch.tensor(y.shape)[1:]).item()
 		self.RealIO = input_size, output_size
 		print("[INFO] Your dataset I/O is : " + str((nb_sample,self.RealIO)))
+		print("[WARNING] If you have a 2D output (ex: Image), you need to reshape output prediction !")
 		# data verification size
 		data_ratio = nb_sample / self.BATCH
 		if self.NB_E_P_G > data_ratio :
