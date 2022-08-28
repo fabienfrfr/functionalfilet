@@ -22,7 +22,7 @@ from functionalfilet import model as ff, utils as f
 
 ## ff model
 Transition = namedtuple('Transition',('state', 'action', 'next_state', 'reward', 'done'))
-model = ff.FunctionalFilet(train_size=1e3, TYPE="RL", NAMED_MEMORY=Transition, TIME_DEPENDANT = True)
+model = ff.FunctionalFilet(train_size=1e3, TYPE="RL", NAMED_MEMORY=Transition)#, TIME_DEPENDANT = True)
 
 ## RL environment
 print("[INFO] Launch reinforcement learning environment..")
@@ -32,7 +32,7 @@ model.set_IO((env.observation_space.shape[0], env.action_space.n))
 print("[INFO] Apply IO modification..")
 for s in model.SEEDER_LIST : s.checkIO(*model.RealIO)
 
-load_name = 'RL_20220824_162415'
+load_name = 'RL_2220824_162415'
 path = os.path.expanduser('~')+'/Saved_Model/ff_' + load_name
 if os.path.isdir(path):
 	### LOAD

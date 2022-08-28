@@ -7,7 +7,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(here, "README.rst")) as fh :
     long_description = fh.read()
 
-VERSION = '0.5.0'
+VERSION = '0.5.1'
 DESCRIPTION = 'Evolutionnary Neural Network Model with PyTorch'
 
 # Setting up
