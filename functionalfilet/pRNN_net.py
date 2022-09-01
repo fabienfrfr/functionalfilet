@@ -38,8 +38,13 @@ class pRNN(nn.Module):
 					# pseudo-RNN (virtual input)
 					if (self.NET[j, 3] >= self.NET[i, 3]) : tensor += [self.h[j][BATCH_,None,k]]
 					# Non Linear input
-					else : tensor += [trace[j][BATCH_,None,k]]
-				if requires_stack : tensor[-1] = tensor[-1][None]
+					else :
+						if requires_stack :
+							tensor += [trace[j][0,None,k]]
+						else :
+							tensor += [trace[j][BATCH_,None,k]]
+				if requires_stack :
+					tensor[-1] = tensor[-1][None]
 			tensor_in = torch.cat(tensor, dim=1)
 			trace[i] = self.Layers[i](tensor_in)
 		return i, trace
