@@ -4,7 +4,7 @@
 
 ###### Attribution required : Fabien Furfaro (CC 4.0 BY NC ND SA)
 
-Functional-Filet is stable only from version 0.5.0, any previous version corresponds to the development phase.
+Functional-Filet is stable only from version 0.5.2, any previous version corresponds to the development phase.
 
 However, there are several possible optimizations, in particular on the restructuring of *Torch* tensors in Python which could be done in C++. For this, it is possible that there will be several code modifications in the future.
 
