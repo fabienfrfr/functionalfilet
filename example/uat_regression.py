@@ -30,7 +30,7 @@ y = f(X)
 
 ## ff model
 model = ff.FunctionalFilet(train_size=1e4, TYPE="regress", INVERT="same")#, multiprocessing=True)
-load_name = 'regress_20220823_134320'
+load_name = 'regress_2220823_134320'
 
 ## fit (or load)
 path = os.path.expanduser('~')+'/Saved_Model/ff_' + load_name

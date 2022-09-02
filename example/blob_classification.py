@@ -34,7 +34,7 @@ X, y = torch.tensor(X, dtype=torch.float), torch.tensor(y).type(torch.LongTensor
 
 ## ff model
 model = ff.FunctionalFilet(train_size=1e5, INVERT=True)
-load_name = 'class_20220823_180834'
+load_name = 'class_2220823_180834'
 
 ## fit (or load)
 path = os.path.expanduser('~')+'/Saved_Model/ff_' + load_name
