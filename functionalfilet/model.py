@@ -107,7 +107,7 @@ class FunctionalFilet():
 			if self.TYPE == "class" :
 				self.criterion = [nn.CrossEntropyLoss().to(self.DEVICE) for n in range(self.NB_SEEDER)]
 			else :
-				self.criterion = [nn.SmoothL1Loss().to(self.DEVICE) for n in range(self.NB_SEEDER)] # regression / RL
+				self.criterion = [nn.SmoothL1Loss().to(self.DEVICE) for n in range(self.NB_SEEDER)] # regression / RL (critic adapted only)
 		else :
 			# custom loss function
 			self.criterion = [self.lossF().to(self.DEVICE) for n in range(self.NB_SEEDER)]
